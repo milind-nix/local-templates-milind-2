@@ -9,6 +9,7 @@ TEMPLATE_ROOT = Path(__file__).resolve().parents[3]
 if str(TEMPLATE_ROOT) not in sys.path:
     sys.path.insert(0, str(TEMPLATE_ROOT))
 
+import numpy as np
 import pandas as pd
 import polars as pl
 from prefect import flow, get_run_logger
@@ -227,6 +228,108 @@ def _placement_rows(
             out[f"{col}_abstain_reason"] = str(reason) if reason else None
         rows.append(out)
     return pd.DataFrame(rows)
+
+
+_UPSTREAM_PATCHED = False
+
+
+def _patch_upstream_landmark_bugs(logger: Any) -> None:
+    """Repair two nextier-dash defects that silently delete `ttr` and `slurry_end`.
+
+    Between them these cost two of the three substage SPANS. `slurry` runs
+    pad_end -> slurry_end and `flush` runs slurry_end -> stage_end, so losing
+    slurry_end alone leaves everything after the pad unlabeled. On
+    AUSTIN 474-1004H that is the difference between 1,821 labels and 13,814.
+
+    We cannot change nextier-dash, so both are corrected here, at the seam.
+    Each patch first checks whether the defect is actually present, so when
+    upstream fixes these the patch becomes a no-op rather than a new bug.
+
+    BUG 1 -- `ttr`, "design rate never sustained after SS" on every stage.
+        `placement.py` calls `detect_auto_rampup_stable_end(..., ref_rate=...)`
+        but that function has no `ref_rate` parameter. The TypeError is
+        swallowed by a bare `except Exception` which sets `ttr_rel = None`, and
+        the abstention message then blames the data. The detector never ran at
+        all. Dropping the unsupported kwarg restores the documented call.
+
+    BUG 2 -- `slurry_end`, "bad window" on every stage.
+        `channels.py` returns `(conc, rate, t_ns)`; its one and only consumer,
+        `placement.py`, unpacks `s_t, s_r, s_c = slurry_ctx`. So `s_t` is the
+        CONCENTRATION array, and the `np.searchsorted(s_t, <nanoseconds>)` that
+        follows runs off the end of it every time, giving an empty window.
+        The documented contract is `(t_ns, rate, conc)` and `placement.py` is
+        the side that honours it, so the returned tuple is reordered here.
+        Detected by value, not by trust: nanosecond timestamps are enormous
+        (>1e17) where a concentration in ppa is not.
+
+    Both are post-d7c01904 regressions -- the repo's own frozen fixture
+    (`layer_placements.csv.gz`) has ttr placed on 4,326 of 5,899 stages and
+    contains the string "bad window" exactly zero times.
+    """
+    global _UPSTREAM_PATCHED
+    if _UPSTREAM_PATCHED:
+        return
+    _UPSTREAM_PATCHED = True
+
+    import inspect
+
+    try:
+        import nextier_utils.labeling.sapphire.placement as _placement
+        import nextier_utils.labeling.sapphire.pipeline as _pipeline
+    except Exception:  # noqa: BLE001 -- never let a patch break the run
+        logger.exception("Sapphire upstream patch: modules unavailable, skipping")
+        return
+
+    # ---- BUG 1 -------------------------------------------------------------
+    try:
+        target = _placement.detect_auto_rampup_stable_end
+        accepts_ref_rate = "ref_rate" in inspect.signature(target).parameters
+        if accepts_ref_rate:
+            logger.info("Sapphire upstream patch: ttr already accepts ref_rate, no patch needed")
+        else:
+            def _ttr(window: Any, **kwargs: Any) -> Any:
+                kwargs.pop("ref_rate", None)
+                return target(window, **kwargs)
+
+            _placement.detect_auto_rampup_stable_end = _ttr
+            logger.info(
+                "Sapphire upstream patch: dropping unsupported ref_rate kwarg so ttr can run"
+            )
+    except Exception:  # noqa: BLE001
+        logger.exception("Sapphire upstream patch: ttr patch failed, continuing unpatched")
+
+    # ---- BUG 2 -------------------------------------------------------------
+    def _looks_like_ns(arr: Any) -> bool:
+        """True when `arr` is plausibly a nanosecond epoch axis."""
+        try:
+            a = np.asarray(arr)
+            if a.size == 0 or not np.issubdtype(a.dtype, np.integer):
+                return False
+            return bool(np.nanmin(np.abs(a.astype("float64"))) > 1e17)
+        except Exception:  # noqa: BLE001
+            return False
+
+    for name in ("slurry_ctx_for_stage", "slurry_ctx_from_frame"):
+        try:
+            original = getattr(_pipeline, name)
+        except AttributeError:
+            continue
+
+        def _ordered(*args: Any, _orig: Any = original, _nm: str = name, **kwargs: Any) -> Any:
+            result = _orig(*args, **kwargs)
+            if result is None or len(result) != 3:
+                return result
+            first, second, third = result
+            if _looks_like_ns(first):
+                return result  # already (t_ns, rate, conc) -- upstream fixed it
+            if _looks_like_ns(third):
+                return third, second, first  # (conc, rate, t_ns) -> (t_ns, rate, conc)
+            return result  # neither end is a time axis; leave it alone
+
+        setattr(_pipeline, name, _ordered)
+    logger.info(
+        "Sapphire upstream patch: slurry_ctx tuple order normalised to (t_ns, rate, conc)"
+    )
 
 
 def _label_spans(placements: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -549,6 +652,8 @@ async def _process_well(
     from nextier_utils.labeling.sapphire.labels import placements_to_labels_df
     from nextier_utils.labeling.sapphire.pipeline import run_well as run_sapphire_well
     from nextier_utils.labeling.titanium.merge import titanium_merge
+
+    _patch_upstream_landmark_bugs(logger)
 
     # The platform's telemetry column is `record_ts`; the algorithm indexes on
     # DATETIME_COL ("datetime_fmt") and reads it by constant, not by parameter -- so
