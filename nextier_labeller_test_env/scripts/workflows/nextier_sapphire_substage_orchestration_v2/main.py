@@ -121,6 +121,7 @@ async def _closed_stages(
         sql=f"""
             SELECT stage_num, stage_uid AS titanium_stage_uid,
                    {start_col} AS t0, {end_col} AS t1,
+                   stage_mass_klb,
                    fleet_name, pad_name, well_name, well_id, api_num
             FROM featurestore:{stage_index_key}
             WHERE {" AND ".join(conditions)}
@@ -591,18 +592,47 @@ async def _process_well(
     # mass using titanium's own integral, so no titanium segmentation is recomputed
     # and the windows are unchanged -- verified 23-in/23-out on HAWKEYE 33-1324H.
     # The integral is window-local, so a partial well frame is fine.
+    # PREFERRED PATH: the mass titanium already computed, carried on the stage
+    # index row. One mass per window by construction, so it cannot misalign.
+    #
+    # The re-derivation below is what misaligns. `titanium_merge` is a MERGE: it
+    # welds light adjacent spans, so feeding it N stored windows can return
+    # fewer than N masses (AUSTIN 474-1004H: 56 windows in, 38 masses out). The
+    # length check then blanks every mass and sapphire abstains on stage_start
+    # and everything measured from it. Reading the stored column avoids the
+    # round trip entirely.
+    #
+    # Only FINAL rows carry a stored mass -- titanium writes it for
+    # `stages_final` only -- so `stage_source=first` still takes the fallback,
+    # as does any index row written before this column existed.
     stage_masses: list[float] = []
-    try:
-        merged = titanium_merge(
-            well_name, df=compute,
-            rate_col="rate_slurry", pressure_col="press_mainline",
-            spans=stage_windows,
-        )
-        stage_masses = list(merged.get("stage_mass_klb") or [])
-        if merged.get("reason"):
-            logger.info("Sapphire mass note well=%s %s", well_name, str(merged["reason"])[:200])
-    except Exception:  # noqa: BLE001 -- mass is an input, not the answer
-        logger.exception("Sapphire stage-mass computation failed well=%s", well_name)
+    stored = pending["stage_mass_klb"] if "stage_mass_klb" in pending.columns else None
+    if stored is not None:
+        vals = pd.to_numeric(stored, errors="coerce")
+        if vals.notna().all() and len(vals) == len(stage_windows):
+            stage_masses = [float(v) for v in vals]
+            logger.info(
+                "Sapphire using STORED titanium masses well=%s stages=%s",
+                well_name, len(stage_masses),
+            )
+        elif vals.notna().any():
+            logger.info(
+                "Sapphire stored masses incomplete well=%s have=%s of %s -- recomputing",
+                well_name, int(vals.notna().sum()), len(stage_windows),
+            )
+
+    if not stage_masses:
+        try:
+            merged = titanium_merge(
+                well_name, df=compute,
+                rate_col="rate_slurry", pressure_col="press_mainline",
+                spans=stage_windows,
+            )
+            stage_masses = list(merged.get("stage_mass_klb") or [])
+            if merged.get("reason"):
+                logger.info("Sapphire mass note well=%s %s", well_name, str(merged["reason"])[:200])
+        except Exception:  # noqa: BLE001 -- mass is an input, not the answer
+            logger.exception("Sapphire stage-mass computation failed well=%s", well_name)
 
     # Loud, because silence here is what made v1 look like it worked. A length
     # mismatch means every landmark downstream of stage_start will abstain.

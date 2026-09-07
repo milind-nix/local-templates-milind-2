@@ -90,7 +90,91 @@ async def _previous_stage_offset(
     return int(value or 0)
 
 
-def _build_stage_index(labels: pd.DataFrame, run_id: str, algorithm_version: str, mode: str) -> pd.DataFrame:
+def _final_stage_masses(
+    compute: pd.DataFrame,
+    well_name: str,
+    result: Any,
+    logger: Any,
+) -> tuple[dict[int, float], str | None]:
+    """Sand mass per FINAL stage ordinal, plus titanium's own merge note.
+
+    Why this is worth a second pipeline pass:
+
+    `TitaniumResult.stage_mass_klb` is `base["stage_mass_klb"]` -- aligned to
+    `stages_base`, BEFORE the sand/schedule split runs. When a split fires,
+    `stages_final` is longer than `stages_base` and the two no longer line up,
+    so the masses on the result object cannot be zipped onto the final stages.
+    `_apply_splits` is what redistributes them, and it needs the split grid,
+    which the result object does not carry.
+
+    `titanium_merged_full(split=True, split_mode="final")` is the SSOT helper
+    that runs detect -> merge -> continuity -> split and returns `stages` and
+    `stage_mass_klb` aligned AFTER the split. It costs a second detect/merge
+    pass over the same frame; the alternative is re-deriving the split
+    apportionment here, which would put algorithm code in the template and
+    could go silently wrong.
+
+    Guarded on the windows coming back identical to `result.stages_final`. If
+    they diverge for any reason, this returns no masses rather than masses
+    attached to the wrong stages -- a NULL makes sapphire fall back to its own
+    computation, a wrong number would not.
+
+    FINAL only. `stages_first` is a different list with a different split, and
+    a mass map for it would mean a third pass. Rows with `stage_status='first'`
+    keep a NULL mass and sapphire's `stage_source=first` path falls back.
+    """
+    try:
+        from nextier_utils.labeling.titanium.pipeline import titanium_merged_full
+
+        full = titanium_merged_full(
+            well_name, compute,
+            rate_col="rate_slurry", pressure_col="press_mainline",
+            split=True, split_mode="final",
+        )
+    except Exception:  # noqa: BLE001 -- mass is an enrichment, not the answer
+        logger.exception("Titanium stage-mass computation failed well=%s", well_name)
+        return {}, getattr(result, "merge_note", None)
+
+    note = full.get("merge_note") or getattr(result, "merge_note", None)
+    stages = list(full.get("stages") or [])
+    masses = list(full.get("stage_mass_klb") or [])
+    expected = list(getattr(result, "stages_final", None) or [])
+
+    def _norm(spans: list[Any]) -> list[tuple[Any, Any]]:
+        return [(pd.Timestamp(a), pd.Timestamp(b)) for a, b in spans]
+
+    if len(masses) != len(stages) or _norm(stages) != _norm(expected):
+        logger.warning(
+            "Titanium stage-mass DIVERGED well=%s final_stages=%s recomputed=%s masses=%s "
+            "-- writing NULL masses; sapphire will fall back to its own computation",
+            well_name, len(expected), len(stages), len(masses),
+        )
+        return {}, note
+
+    out: dict[int, float] = {}
+    for k, m in enumerate(masses, start=1):
+        try:
+            mv = float(m)
+        except (TypeError, ValueError):
+            continue
+        if np.isfinite(mv):
+            out[k] = mv
+    logger.info(
+        "Titanium stage-mass ready well=%s stages=%s finite_masses=%s merge_note=%s",
+        well_name, len(stages), len(out), str(note)[:200] if note else None,
+    )
+    return out, note
+
+
+def _build_stage_index(
+    labels: pd.DataFrame,
+    run_id: str,
+    algorithm_version: str,
+    mode: str,
+    stage_mass_by_ordinal: dict[int, float] | None = None,
+    stage_offset: int = 0,
+    merge_note: str | None = None,
+) -> pd.DataFrame:
     if labels.empty:
         return pd.DataFrame()
     frame = labels.copy().sort_values(["record_ts", "created_ts", "telemetry_point_id"], na_position="last")
@@ -136,6 +220,28 @@ def _build_stage_index(labels: pd.DataFrame, run_id: str, algorithm_version: str
             "avg_press_mainline": group["press_mainline"].astype(float).mean() if "press_mainline" in group else None,
             "max_press_mainline": group["press_mainline"].astype(float).max() if "press_mainline" in group else None,
             "stage_status": status,
+            # Sand mass for this stage, from titanium's own integral.
+            #
+            # Sapphire needs one mass per stage window or it abstains on
+            # stage_start and everything measured from it. Without this column
+            # it re-derives them by feeding the STORED windows back through
+            # `titanium_merge`, which welds light adjacent spans and so returns
+            # FEWER masses than there are stages (AUSTIN 474-1004H: 56 stages,
+            # 38 masses) -- the "stage-mass MISALIGNED" warning. Carrying the
+            # mass titanium already computed removes the round trip entirely.
+            #
+            # `stage_num` here is offset-adjusted for backfill continuity;
+            # the map is keyed by the run-local ordinal, hence the subtraction.
+            # FINAL only -- see `_final_stage_masses`.
+            "stage_mass_klb": (
+                (stage_mass_by_ordinal or {}).get(int(stage_num) - int(stage_offset))
+                if status == "final" else None
+            ),
+            # Titanium's own explanation when a well gets no usable masses
+            # (e.g. "concentration channel is not zeroed ... spans are left
+            # UNMERGED"). Previously discarded, which made a mass-starved well
+            # indistinguishable from a healthy one downstream.
+            "merge_note": merge_note,
             "source_stage_column": "titanium_final" if status == "final" else "titanium_first",
             "algorithm_version": algorithm_version,
             "source_mode": mode,
@@ -484,12 +590,44 @@ async def _process_well(
 
     compute = raw.rename(columns={"record_ts": DATETIME_COL}).copy()
     conc_col = CONC_COLUMNS.get(concentration_feature, "prop_conc_blend_auger")
+
+    # Make `concentration_feature` actually select a channel.
+    #
+    # run_titanium_layer aliases the requested column into PROP_CONC_COL and
+    # leaves the rest of the frame alone. But PROP_CONC_COL is
+    # `prop_conc_blend_denso`, which is LAST in CONC_CHANNEL_ORDER
+    # (auger -> target -> inline -> denso), and both `titanium_merge` and
+    # `titanium_split_grid` pick their channel with `first_finite_conc_col`,
+    # which walks that order. So the alias is only ever consulted when the
+    # three higher-priority channels are all empty, and picking `denso`
+    # explicitly is a no-op besides (the aliasing is guarded on
+    # `conc_col != PROP_CONC_COL`). In practice any well with a populated
+    # auger channel was silently computed on auger no matter what was
+    # requested.
+    #
+    # Dropping the other channels from the COMPUTE frame -- `raw` is untouched,
+    # so the label rows still carry all four for the charts -- leaves
+    # `first_finite_conc_col` exactly one candidate, which is the requested
+    # one. Only done when the requested channel actually has finite data:
+    # otherwise this would turn "your pick is empty" into "this well has no
+    # concentration at all" and silently disable merge and split.
+    conc_selected = conc_col
+    if conc_col in compute.columns:
+        vals = pd.to_numeric(compute[conc_col], errors="coerce")
+        if bool(np.isfinite(vals.to_numpy(dtype=float)).any()):
+            drop = [c for c in CONC_COLUMNS.values() if c != conc_col and c in compute.columns]
+            compute = compute.drop(columns=drop)
+        else:
+            conc_selected = f"{conc_col} (EMPTY -- falling back to channel order)"
+    else:
+        conc_selected = f"{conc_col} (ABSENT -- falling back to channel order)"
+
     logger.info(
         "Titanium compute start well=%s rows=%s algorithm_version=%s conc_col=%s ds_callable=nextier_core.titanium_layer.run_titanium_layer",
         well_name,
         len(compute),
         algorithm_version,
-        conc_col,
+        conc_selected,
     )
     result = run_titanium_layer(
         compute,
@@ -498,6 +636,7 @@ async def _process_well(
         pressure_col="press_mainline",
         conc_col=conc_col,
     )
+    stage_mass_by_ordinal, merge_note = _final_stage_masses(compute, well_name, result, logger)
     labeled = raw.copy()
     labeled["titanium_first"] = np.asarray(result.titanium_first, dtype=float)
     labeled["titanium_final"] = np.asarray(result.titanium_final, dtype=float)
@@ -554,7 +693,12 @@ async def _process_well(
     write_frame = enriched
     if effective_start_ts is not None:
         write_frame = write_frame[pd.to_datetime(write_frame["record_ts"], errors="coerce") >= effective_start_ts]
-    stage_index = _build_stage_index(enriched, run_id, algorithm_version, mode)
+    stage_index = _build_stage_index(
+        enriched, run_id, algorithm_version, mode,
+        stage_mass_by_ordinal=stage_mass_by_ordinal,
+        stage_offset=offset,
+        merge_note=merge_note,
+    )
 
     if not dry_run:
         if delete_existing:
