@@ -1,0 +1,205 @@
+{
+  "key": "nextier_labeling_historical_frac76_orchestration_v1",
+  "displayName": "Nextier Labeling Historical Orchestration - Frac 76 V1",
+  "description": "Scheduled incremental bronze-to-copper backfill for Frac 76 only. Dates are optional; without dates it advances pending well/chunk coverage using the manifest.",
+  "runtime": "prefect",
+  "flow": {
+    "entrypoint": "scripts/workflows/nextier_labeling_orchestration_v1/main.py:nextier_labeling_orchestration_v1_flow",
+    "include": [
+      "scripts/workflows/nextier_labeling_orchestration_v1/**/*.py",
+      "scripts/workflows/nextier_bronze_labeling_v1/**/*.py",
+      "scripts/workflows/nextier_copper_labeling_v1/**/*.py",
+      "scripts/workflows/nextier_labeling_common_v1/**/*.py",
+      "scripts/workflows/nextier_auto_labeling_v1/**/*.py"
+    ],
+    "tags": [
+      "nextier",
+      "labeling",
+      "bronze",
+      "copper",
+      "historical",
+      "frac-76"
+    ]
+  },
+  "deployment": {
+    "workPool": "default",
+    "timezone": "UTC",
+    "concurrencyLimit": 1,
+    "parameters": {
+      "mode": "historical",
+      "source_datastore_key": "merged_fleet_stream_customer_full_v2",
+      "max_wells": 5,
+      "delete_existing": true,
+      "dry_run": false,
+      "chunk_hours": 24,
+      "max_chunks": 15,
+      "skip_completed": true,
+      "lookback_hours": 24,
+      "algorithm_version": "nextier_bronze_copper_fullwell_v1",
+      "include_fleet_names": [
+        "Frac 76"
+      ],
+      "boundary_context_hours": 0.5,
+      "max_boundary_expansion_hours": 96
+    },
+    "concurrencyCollisionStrategy": "CANCEL_NEW"
+  },
+  "paramsSchema": {
+    "type": "object",
+    "properties": {
+      "mode": {
+        "type": "string",
+        "enum": [
+          "live",
+          "background",
+          "historical",
+          "debug"
+        ]
+      },
+      "source_datastore_key": {
+        "type": "string",
+        "default": "merged_fleet_stream_customer_full_v2"
+      },
+      "bronze_featurestore_key": {
+        "type": "string",
+        "default": "nextier_bronze_labels_v1"
+      },
+      "copper_featurestore_key": {
+        "type": "string",
+        "default": "nextier_copper_labels_v1"
+      },
+      "stage_index_featurestore_key": {
+        "type": "string",
+        "default": "nextier_copper_stage_index_v1"
+      },
+      "manifest_featurestore_key": {
+        "type": "string",
+        "default": "nextier_labeling_processing_manifest_v1"
+      },
+      "well_name": {
+        "type": "string"
+      },
+      "fleet_name": {
+        "type": "string"
+      },
+      "include_fleet_names": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Optional fleet names to include. Use this to partition runs by fleet."
+      },
+      "exclude_fleet_names": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Optional fleet names to exclude. Cannot be used with include_fleet_names."
+      },
+      "pad_name": {
+        "type": "string"
+      },
+      "start_time": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "end_time": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "lookback_hours": {
+        "type": "number",
+        "minimum": 0
+      },
+      "context_hours": {
+        "type": "number",
+        "minimum": 0,
+        "description": "Optional algorithm context before each chunk. If omitted, historical uses lookback_hours, background uses up to 24h, and live uses at least 6h. This does not change the target lookback window."
+      },
+      "max_wells": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 500,
+        "description": "Maximum wells processed per time chunk."
+      },
+      "delete_existing": {
+        "type": "boolean",
+        "default": true
+      },
+      "dry_run": {
+        "type": "boolean",
+        "default": false
+      },
+      "algorithm_version": {
+        "type": "string",
+        "default": "nextier_bronze_copper_fullwell_v1"
+      },
+      "chunk_hours": {
+        "type": "number",
+        "minimum": 0,
+        "default": 24
+      },
+      "max_chunks": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 1000
+      },
+      "skip_completed": {
+        "type": "boolean",
+        "default": true
+      },
+      "run_auto_labeling_after_stage": {
+        "type": "boolean",
+        "default": false,
+        "description": "When true, run Nextier auto substage labeling after each stage/copper orchestration chunk that writes stage outputs."
+      },
+      "auto_labels_featurestore_key": {
+        "type": "string",
+        "default": "nextier_auto_labels_v1"
+      },
+      "auto_summary_featurestore_key": {
+        "type": "string",
+        "default": "nextier_auto_stage_summary_v1"
+      },
+      "auto_manifest_featurestore_key": {
+        "type": "string",
+        "default": "nextier_auto_processing_manifest_v1"
+      },
+      "auto_algorithm_version": {
+        "type": "string",
+        "default": "nextier_auto_layer_v1"
+      },
+      "auto_concentration_feature": {
+        "type": "string",
+        "default": "all",
+        "enum": [
+          "all",
+          "auger",
+          "denso",
+          "inline",
+          "target"
+        ]
+      },
+      "auto_max_stages": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 1000,
+        "default": 100
+      },
+      "boundary_context_hours": {
+        "type": "number",
+        "minimum": 0,
+        "default": 0.5,
+        "description": "Extra cushion before a boundary stage when a chunk/context start falls inside an existing stage window."
+      },
+      "max_boundary_expansion_hours": {
+        "type": "number",
+        "minimum": 0,
+        "default": 96,
+        "description": "Maximum hours the stage-safe boundary resolver can walk left before falling back to the bounded window."
+      }
+    },
+    "required": []
+  },
+  "initialState": {}
+}

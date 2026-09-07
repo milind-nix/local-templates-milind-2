@@ -1,0 +1,79 @@
+{
+  "key": "nextier_bronze_labels_v1",
+  "displayName": "Nextier Bronze Labels V1",
+  "description": "Row-level bronze continuous substage labels computed directly from telemetry using the DS bronze FSM.",
+  "sql": "SELECT CAST(NULL AS TEXT) AS telemetry_point_id, fleet_name, pad_name, name AS well_name, id AS well_id, api_num, record_ts, created_ts, CAST(NULL AS TEXT) AS bronze_continuous, rate_slurry, press_mainline, prop_conc_blend_denso, prop_conc_blend_auger, prop_conc_inline, prop_conc_target, CAST(NULL AS TEXT) AS algorithm_version, CAST(NULL AS TEXT) AS source_mode, CAST(NULL AS TEXT) AS processed_at FROM datastore:merged_fleet_stream_customer_full_v2 WHERE 1 = 0",
+  "checkpoint_fields": [],
+  "upsert": true,
+  "dataSchema": {
+    "type": "object",
+    "properties": {
+      "telemetry_point_id": {
+        "type": "string",
+        "metadata": {
+          "isPrimaryKey": true
+        }
+      },
+      "fleet_name": {
+        "type": "string"
+      },
+      "pad_name": {
+        "type": "string"
+      },
+      "well_name": {
+        "type": "string"
+      },
+      "well_id": {
+        "type": "string"
+      },
+      "api_num": {
+        "type": "string"
+      },
+      "record_ts": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "created_ts": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "bronze_continuous": {
+        "type": "string"
+      },
+      "rate_slurry": {
+        "type": "number"
+      },
+      "press_mainline": {
+        "type": "number"
+      },
+      "prop_conc_blend_denso": {
+        "type": "number"
+      },
+      "prop_conc_blend_auger": {
+        "type": "number"
+      },
+      "prop_conc_inline": {
+        "type": "number"
+      },
+      "prop_conc_target": {
+        "type": "number"
+      },
+      "algorithm_version": {
+        "type": "string"
+      },
+      "source_mode": {
+        "type": "string"
+      },
+      "processed_at": {
+        "type": "string",
+        "format": "date-time"
+      }
+    },
+    "required": [
+      "telemetry_point_id",
+      "well_name",
+      "record_ts",
+      "bronze_continuous"
+    ]
+  }
+}

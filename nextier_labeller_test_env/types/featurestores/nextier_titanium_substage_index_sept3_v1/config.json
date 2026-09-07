@@ -1,0 +1,103 @@
+{
+  "key": "nextier_titanium_substage_index_sept3_v1",
+  "displayName": "Nextier Titanium Substage Index Sept3 V1",
+  "description": "The THIRD TITANIUM STAGE TIER -- stage windows, not substage labels. Coarse titanium stages re-bound to the substage landmarks sapphire placed: start is open_well when placed and the coarse start otherwise, end is close_well when placed and the coarse end otherwise. Pad, slurry and the stage_start/stage_end landmarks deliberately do NOT move these boundaries. Named in the titanium family because its rows are stage windows and it renders as a layer on the stage dashboard beside titanium_first and titanium_final; the sept3 vintage marks the sapphire run that refined it. Derived from the sapphire stage summary, never computed independently.",
+  "sql": "SELECT CAST(NULL AS TEXT) AS stage_uid, fleet_name AS fleet_name, pad_name AS pad_name, name AS well_name, id AS well_id, api_num AS api_num, CAST(NULL AS DOUBLE PRECISION) AS stage_num, CAST(NULL AS TEXT) AS titanium_stage_uid, CAST(NULL AS TEXT) AS sapphire_stage_uid, CAST(NULL AS TEXT) AS stage_start_ts, CAST(NULL AS TEXT) AS stage_end_ts, CAST(NULL AS TEXT) AS coarse_start_ts, CAST(NULL AS TEXT) AS coarse_end_ts, CAST(NULL AS TEXT) AS start_src, CAST(NULL AS TEXT) AS end_src, CAST(NULL AS TEXT) AS stage_source, CAST(NULL AS TEXT) AS algorithm_version, CAST(NULL AS TEXT) AS source_mode, CAST(NULL AS TEXT) AS run_id, CAST(NULL AS TEXT) AS processed_at FROM datastore:merged_fleet_stream_customer_full_v2 WHERE 1 = 0",
+  "checkpoint_fields": [],
+  "upsert": true,
+  "dataSchema": {
+    "type": "object",
+    "properties": {
+      "stage_uid": {
+        "type": "string",
+        "description": "Synthetic id: well:stage_num:algorithm_version.",
+        "metadata": {
+          "isPrimaryKey": true
+        }
+      },
+      "fleet_name": {
+        "type": "string",
+        "description": "Fleet the well belongs to."
+      },
+      "pad_name": {
+        "type": "string",
+        "description": "Pad the well belongs to."
+      },
+      "well_name": {
+        "type": "string",
+        "description": "Well the stage belongs to."
+      },
+      "well_id": {
+        "type": "string",
+        "description": "Well id from the source stream."
+      },
+      "api_num": {
+        "type": "string",
+        "description": "API number."
+      },
+      "stage_num": {
+        "type": "number",
+        "description": "Stage ordinal, shared with the coarse titanium index."
+      },
+      "titanium_stage_uid": {
+        "type": "string",
+        "description": "Coarse titanium stage index row this refines."
+      },
+      "sapphire_stage_uid": {
+        "type": "string",
+        "description": "Sapphire stage summary row that supplied the landmarks."
+      },
+      "stage_start_ts": {
+        "type": "string",
+        "description": "Refined start."
+      },
+      "stage_end_ts": {
+        "type": "string",
+        "description": "Refined end."
+      },
+      "coarse_start_ts": {
+        "type": "string",
+        "description": "Titanium window start this refined from, kept so the shift is auditable rather than implied."
+      },
+      "coarse_end_ts": {
+        "type": "string",
+        "description": "Titanium window end this refined from."
+      },
+      "start_src": {
+        "type": "string",
+        "description": "'open_well' when placed, else 'coarse_t0'."
+      },
+      "end_src": {
+        "type": "string",
+        "description": "'close_well' when placed, else 'coarse_t1'."
+      },
+      "stage_source": {
+        "type": "string",
+        "description": "Titanium split that supplied the coarse window."
+      },
+      "algorithm_version": {
+        "type": "string",
+        "description": "Sapphire algorithm version that refined it."
+      },
+      "source_mode": {
+        "type": "string",
+        "description": "live / background / historical."
+      },
+      "run_id": {
+        "type": "string",
+        "description": "Workflow run that wrote the row."
+      },
+      "processed_at": {
+        "type": "string",
+        "description": "When the row was written."
+      }
+    },
+    "required": [
+      "stage_uid",
+      "well_name",
+      "stage_num",
+      "stage_start_ts",
+      "stage_end_ts"
+    ]
+  }
+}

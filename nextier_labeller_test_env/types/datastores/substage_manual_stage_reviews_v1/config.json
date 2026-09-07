@@ -1,0 +1,91 @@
+{
+  "key": "substage_manual_stage_reviews_v1",
+  "displayName": "Substage Manual Stage Reviews",
+  "description": "Review state for derived manual stage groups. Groups are derived from persisted manual start/end annotations; only review metadata is stored here.",
+  "dataSchema": {
+    "type": "object",
+    "properties": {
+      "group_key": {
+        "type": "string",
+        "metadata": {
+          "isPrimaryKey": true
+        }
+      },
+      "layer_id": {
+        "type": "string"
+      },
+      "labeler_id": {
+        "type": "string"
+      },
+      "fleet_name": {
+        "type": "string"
+      },
+      "pad_name": {
+        "type": "string"
+      },
+      "well_name": {
+        "type": "string"
+      },
+      "stage_num": {
+        "type": "number"
+      },
+      "start_annotation_id": {
+        "type": "string"
+      },
+      "end_annotation_id": {
+        "type": "string"
+      },
+      "start_marker": {
+        "type": "string"
+      },
+      "end_marker": {
+        "type": "string"
+      },
+      "start_time": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "end_time": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "approval_status": {
+        "type": "string"
+      },
+      "review_message": {
+        "type": "string"
+      },
+      "reviewed_by_email": {
+        "type": "string"
+      },
+      "reviewed_at": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "created_at": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "updated_at": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "status": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "group_key",
+      "layer_id",
+      "well_name",
+      "start_annotation_id",
+      "end_annotation_id",
+      "start_time",
+      "end_time",
+      "approval_status",
+      "status",
+      "created_at",
+      "updated_at"
+    ]
+  }
+}

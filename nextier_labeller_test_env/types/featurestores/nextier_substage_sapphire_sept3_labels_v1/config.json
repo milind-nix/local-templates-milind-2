@@ -1,0 +1,107 @@
+{
+  "key": "nextier_substage_sapphire_sept3_labels_v1",
+  "displayName": "Nextier Substage Sapphire Sept3 Labels V1",
+  "description": "Row-level substage labels from the Sapphire layer -- one row per labeled telemetry sample. Mirrors nextier_substage_silver_aug27_labels_v1 so the substage dashboard can read either chain.",
+  "sql": "SELECT CAST(NULL AS TEXT) AS sapphire_label_id, CAST(NULL AS TEXT) AS telemetry_point_id, fleet_name AS fleet_name, pad_name AS pad_name, name AS well_name, id AS well_id, api_num AS api_num, record_ts AS record_ts, created_ts AS created_ts, CAST(NULL AS DOUBLE PRECISION) AS stage_num, CAST(NULL AS TEXT) AS sapphire_stage_uid, CAST(NULL AS TEXT) AS substage_label, CAST(NULL AS TEXT) AS label_kind, CAST(NULL AS BOOLEAN) AS stage_closed, CAST(NULL AS TEXT) AS stage_source, CAST(NULL AS TEXT) AS concentration_feature, CAST(NULL AS TEXT) AS conc_col, CAST(NULL AS TEXT) AS algorithm_version, CAST(NULL AS TEXT) AS source_mode, CAST(NULL AS TEXT) AS run_id, CAST(NULL AS TEXT) AS processed_at FROM datastore:merged_fleet_stream_customer_full_v2 WHERE 1 = 0",
+  "checkpoint_fields": [],
+  "upsert": true,
+  "dataSchema": {
+    "type": "object",
+    "properties": {
+      "sapphire_label_id": {
+        "type": "string",
+        "description": "Synthetic label id: telemetry_point_id:algorithm_version. The primary key is this rather than telemetry_point_id because one telemetry sample can carry a label from more than one algorithm version -- keying on the sample would make the newer run silently delete the older one.",
+        "metadata": {
+          "isPrimaryKey": true
+        }
+      },
+      "telemetry_point_id": {
+        "type": "string",
+        "description": "Source telemetry row this label describes. Plain column, not the key, exactly as aug27 does it."
+      },
+      "fleet_name": {
+        "type": "string",
+        "description": "Fleet the well belongs to."
+      },
+      "pad_name": {
+        "type": "string",
+        "description": "Pad the well belongs to."
+      },
+      "well_name": {
+        "type": "string",
+        "description": "Well the sample belongs to."
+      },
+      "well_id": {
+        "type": "string",
+        "description": "Well id from the source stream."
+      },
+      "api_num": {
+        "type": "string",
+        "description": "API number."
+      },
+      "record_ts": {
+        "type": "string",
+        "description": "Sample timestamp."
+      },
+      "created_ts": {
+        "type": "string",
+        "description": "Source row creation timestamp."
+      },
+      "stage_num": {
+        "type": "number",
+        "description": "Coarse titanium stage the sample falls in."
+      },
+      "sapphire_stage_uid": {
+        "type": "string",
+        "description": "Stage summary row this label came from."
+      },
+      "substage_label": {
+        "type": "string",
+        "description": "Substage name for the sample."
+      },
+      "label_kind": {
+        "type": "string",
+        "description": "How the label was derived -- which landmark pair bounds it."
+      },
+      "stage_closed": {
+        "type": "boolean",
+        "description": "Always true for sapphire: it is post-stage by construction. Carried so the column means the same thing on both chains."
+      },
+      "stage_source": {
+        "type": "string",
+        "description": "Titanium split that supplied the coarse window."
+      },
+      "concentration_feature": {
+        "type": "string",
+        "description": "Requested concentration feature."
+      },
+      "conc_col": {
+        "type": "string",
+        "description": "Concentration column actually used, or null."
+      },
+      "algorithm_version": {
+        "type": "string",
+        "description": "Sapphire algorithm version."
+      },
+      "source_mode": {
+        "type": "string",
+        "description": "live / background / historical."
+      },
+      "run_id": {
+        "type": "string",
+        "description": "Workflow run that wrote the row."
+      },
+      "processed_at": {
+        "type": "string",
+        "description": "When the row was written."
+      }
+    },
+    "required": [
+      "sapphire_label_id",
+      "telemetry_point_id",
+      "well_name",
+      "record_ts",
+      "substage_label"
+    ]
+  }
+}

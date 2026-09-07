@@ -208,6 +208,74 @@ async def _compute_rollup_chunk(
     )
 
 
+async def _get_source_end(
+    workspace_id: int,
+    fleet_name: str | None,
+    pad_name: str | None,
+    well_name: str | None,
+) -> datetime | None:
+    bounds_df = await query_store(
+        sql=f"""
+            SELECT
+              MAX(CAST(record_ts AS timestamp)) AS end_ts
+            FROM datastore:{SOURCE_DATASTORE_KEY}
+            WHERE
+              record_ts IS NOT NULL
+              AND name IS NOT NULL
+              AND (:fleet_name = '' OR COALESCE(NULLIF(fleet_name, ''), 'Unknown') = :fleet_name)
+              AND (:pad_name = '' OR COALESCE(NULLIF(pad_name, ''), 'Unknown') = :pad_name)
+              AND (:well_name = '' OR name = :well_name)
+        """,
+        workspace_id=workspace_id,
+        params={
+            "fleet_name": fleet_name or "",
+            "pad_name": pad_name or "",
+            "well_name": well_name or "",
+        },
+    )
+    if bounds_df.is_empty():
+        return None
+    bounds = bounds_df.to_pandas()
+    if pd.isna(bounds.iloc[0]["end_ts"]):
+        return None
+    return _parse_time(str(bounds.iloc[0]["end_ts"]))
+
+
+async def _get_rollup_checkpoint(
+    workspace_id: int,
+    bucket_seconds: int,
+    fleet_name: str | None,
+    pad_name: str | None,
+    well_name: str | None,
+) -> datetime | None:
+    checkpoint_df = await query_store(
+        sql=f"""
+            SELECT
+              MAX(CAST(bucket_ts AS timestamp)) AS checkpoint_ts
+            FROM datastore:{ROLLUP_DATASTORE_KEY}
+            WHERE
+              CAST(bucket_seconds AS integer) = :bucket_seconds
+              AND bucket_ts IS NOT NULL
+              AND (:fleet_name = '' OR COALESCE(NULLIF(fleet_name, ''), 'Unknown') = :fleet_name)
+              AND (:pad_name = '' OR COALESCE(NULLIF(pad_name, ''), 'Unknown') = :pad_name)
+              AND (:well_name = '' OR name = :well_name)
+        """,
+        workspace_id=workspace_id,
+        params={
+            "bucket_seconds": int(bucket_seconds),
+            "fleet_name": fleet_name or "",
+            "pad_name": pad_name or "",
+            "well_name": well_name or "",
+        },
+    )
+    if checkpoint_df.is_empty():
+        return None
+    checkpoint = checkpoint_df.to_pandas()
+    if pd.isna(checkpoint.iloc[0]["checkpoint_ts"]):
+        return None
+    return _parse_time(str(checkpoint.iloc[0]["checkpoint_ts"]))
+
+
 async def _get_source_bounds(
     workspace_id: int,
     fleet_name: str | None,
@@ -298,8 +366,48 @@ async def nextier_merged_telemetry_rollup_flow(
         end_ts = backfill_end
     else:
         mode = "explicit" if explicit_start is not None or explicit_end is not None else "scheduled"
-        end_ts = explicit_end or _utc_now_naive()
-        start_ts = explicit_start or (end_ts - timedelta(minutes=max(int(lookback_minutes), 1)))
+        source_end = await _get_source_end(
+            workspace_id=workspace_id,
+            fleet_name=fleet_name,
+            pad_name=pad_name,
+            well_name=well_name,
+        )
+        if source_end is None:
+            result = {
+                "rollup_datastore": ROLLUP_DATASTORE_KEY,
+                "bucket_seconds": bucket_seconds,
+                "mode": mode,
+                "rows_upserted": 0,
+                "chunks": [],
+                "reason": "no_source_records",
+            }
+            logger.info("Merged telemetry rollup result: %s", result)
+            return result
+
+        if explicit_start is not None or explicit_end is not None:
+            end_ts = explicit_end or source_end
+            start_ts = explicit_start or (end_ts - timedelta(minutes=max(int(lookback_minutes), 1)))
+        else:
+            rollup_checkpoint = await _get_rollup_checkpoint(
+                workspace_id=workspace_id,
+                bucket_seconds=bucket_seconds,
+                fleet_name=fleet_name,
+                pad_name=pad_name,
+                well_name=well_name,
+            )
+            persisted_checkpoint = _parse_time(state.get(CHECKPOINT_KEY))
+            checkpoint = rollup_checkpoint or persisted_checkpoint or source_end
+            end_ts = min(source_end, _utc_now_naive())
+            start_ts = checkpoint - timedelta(
+                minutes=max(int(lookback_minutes), 1),
+            )
+            logger.info(
+                "Merged telemetry rollup checkpoint bucket_seconds=%s rollup_checkpoint=%s state_checkpoint=%s source_end=%s",
+                bucket_seconds,
+                _format_time(rollup_checkpoint) if rollup_checkpoint else None,
+                _format_time(persisted_checkpoint) if persisted_checkpoint else None,
+                _format_time(source_end),
+            )
 
     if start_ts >= end_ts:
         result = {

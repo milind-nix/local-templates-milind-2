@@ -1,0 +1,100 @@
+{
+  "key": "nextier_substage_sapphire_sept3_processing_manifest_v2",
+  "displayName": "Nextier Substage Sapphire Sept3 Processing Manifest V2",
+  "description": "Per-well progress for the Sapphire workflow, matching nextier_substage_silver_aug27_processing_manifest_v1. This is what makes skip_completed and well-wise resumption work -- without it every re-run starts from scratch.",
+  "sql": "SELECT CAST(NULL AS TEXT) AS manifest_id, CAST(NULL AS TEXT) AS run_id, CAST(NULL AS TEXT) AS workflow_name, CAST(NULL AS TEXT) AS mode, CAST(NULL AS TEXT) AS source_datastore_key, name AS well_name, CAST(NULL AS TEXT) AS requested_start_ts, CAST(NULL AS TEXT) AS requested_end_ts, CAST(NULL AS TEXT) AS effective_start_ts, CAST(NULL AS TEXT) AS effective_end_ts, CAST(NULL AS DOUBLE PRECISION) AS chunk_hours, CAST(NULL AS DOUBLE PRECISION) AS chunk_index, CAST(NULL AS DOUBLE PRECISION) AS stage_rows, CAST(NULL AS DOUBLE PRECISION) AS label_rows, CAST(NULL AS DOUBLE PRECISION) AS window_rows, CAST(NULL AS TEXT) AS algorithm_version, CAST(NULL AS TEXT) AS status, CAST(NULL AS BOOLEAN) AS dry_run, CAST(NULL AS TEXT) AS started_at, CAST(NULL AS TEXT) AS completed_at FROM datastore:merged_fleet_stream_customer_full_v2 WHERE 1 = 0",
+  "checkpoint_fields": [],
+  "upsert": true,
+  "dataSchema": {
+    "type": "object",
+    "properties": {
+      "manifest_id": {
+        "type": "string",
+        "description": "Unique id for the run/well slice.",
+        "metadata": {
+          "isPrimaryKey": true
+        }
+      },
+      "run_id": {
+        "type": "string",
+        "description": "Workflow run id."
+      },
+      "workflow_name": {
+        "type": "string",
+        "description": "Workflow that produced the row."
+      },
+      "mode": {
+        "type": "string",
+        "description": "live / background / historical."
+      },
+      "source_datastore_key": {
+        "type": "string",
+        "description": "Telemetry source read."
+      },
+      "well_name": {
+        "type": "string",
+        "description": "Well processed."
+      },
+      "requested_start_ts": {
+        "type": "string",
+        "description": "Window asked for."
+      },
+      "requested_end_ts": {
+        "type": "string",
+        "description": "Window asked for."
+      },
+      "effective_start_ts": {
+        "type": "string",
+        "description": "Window actually covered after context expansion."
+      },
+      "effective_end_ts": {
+        "type": "string",
+        "description": "Window actually covered after context expansion."
+      },
+      "chunk_hours": {
+        "type": "number",
+        "description": "Chunk size used."
+      },
+      "chunk_index": {
+        "type": "number",
+        "description": "Chunk ordinal within the well."
+      },
+      "stage_rows": {
+        "type": "number",
+        "description": "Stage summary rows written."
+      },
+      "label_rows": {
+        "type": "number",
+        "description": "Row-level label rows written."
+      },
+      "window_rows": {
+        "type": "number",
+        "description": "Refined titanium substage window rows written."
+      },
+      "algorithm_version": {
+        "type": "string",
+        "description": "Sapphire algorithm version."
+      },
+      "status": {
+        "type": "string",
+        "description": "written / skipped / empty / failed."
+      },
+      "dry_run": {
+        "type": "boolean",
+        "description": "True when the run computed but deliberately wrote nothing."
+      },
+      "started_at": {
+        "type": "string",
+        "description": "Start time."
+      },
+      "completed_at": {
+        "type": "string",
+        "description": "Completion time."
+      }
+    },
+    "required": [
+      "manifest_id",
+      "well_name"
+    ]
+  }
+}

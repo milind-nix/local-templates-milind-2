@@ -8,7 +8,13 @@
     "include": [
       "scripts/workflows/nextier_merged_stage_execution_scoring_v1/**/*.py"
     ],
-    "tags": ["nextier", "merged", "stage-execution", "scoring", "v1"]
+    "tags": [
+      "nextier",
+      "merged",
+      "stage-execution",
+      "scoring",
+      "v1"
+    ]
   },
   "deployment": {
     "workPool": "default",
@@ -20,14 +26,19 @@
       "formula_version": "stage-execution-v1.0",
       "normalization_version": "percentile-v1",
       "dry_run": false
-    }
+    },
+    "concurrencyCollisionStrategy": "CANCEL_NEW"
   },
   "paramsSchema": {
     "type": "object",
     "properties": {
       "mode": {
         "type": "string",
-        "enum": ["incremental", "historical", "rebuild"],
+        "enum": [
+          "incremental",
+          "historical",
+          "rebuild"
+        ],
         "default": "incremental"
       },
       "max_stages": {
@@ -36,8 +47,12 @@
         "maximum": 500,
         "default": 25
       },
-      "well_name": {"type": "string"},
-      "stage_num_td": {"type": "number"},
+      "well_name": {
+        "type": "string"
+      },
+      "stage_num_td": {
+        "type": "number"
+      },
       "formula_version": {
         "type": "string",
         "default": "stage-execution-v1.0"
@@ -46,7 +61,10 @@
         "type": "string",
         "default": "percentile-v1"
       },
-      "dry_run": {"type": "boolean", "default": false}
+      "dry_run": {
+        "type": "boolean",
+        "default": false
+      }
     },
     "required": []
   },

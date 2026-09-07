@@ -1,8 +1,8 @@
 {
   "key": "merged_stage_time_bounds_v1",
   "displayName": "Merged Stage Time Bounds",
-  "description": "Start and end timestamps for a selected live TD stage.",
-  "sql": "SELECT * FROM (SELECT name AS well_name, stage_num_td AS stage_num, stage_start_ts AS start_time, stage_end_ts AS end_time FROM featurestore:merged_td_stage_index_v1 WHERE name = :well_name AND stage_num_td = :stage_num LIMIT 1) q",
+  "description": "Start and end timestamps for a selected silver/copper stage.",
+  "sql": "SELECT * FROM (SELECT well_name, stage_num, COALESCE(CAST(continuous_start_ts AS timestamp), CAST(stage_start_ts AS timestamp)) AS start_time, COALESCE(CAST(continuous_end_ts AS timestamp), CAST(stage_end_ts AS timestamp)) AS end_time FROM featurestore:nextier_copper_stage_index_v1 WHERE well_name = :well_name AND stage_num = :stage_num AND COALESCE(CAST(continuous_start_ts AS timestamp), CAST(stage_start_ts AS timestamp)) IS NOT NULL AND COALESCE(CAST(continuous_end_ts AS timestamp), CAST(stage_end_ts AS timestamp)) IS NOT NULL LIMIT 1) q",
   "valueSchema": {
     "type": "object",
     "properties": {

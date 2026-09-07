@@ -24,7 +24,8 @@
       "max_stages": 10,
       "algorithm_version": "tuning-v1",
       "dry_run": false
-    }
+    },
+    "concurrencyCollisionStrategy": "CANCEL_NEW"
   },
   "paramsSchema": {
     "type": "object",

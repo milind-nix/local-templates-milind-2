@@ -1,0 +1,58 @@
+{
+  "key": "nextier_titanium_substage_stage_windows_v1",
+  "displayName": "Nextier Titanium Substage Stage Windows V1",
+  "description": "Titanium stage windows re-cut to the Sapphire open_well -> close_well landmarks (the substage-refined tier). Falls back to the coarse bound wherever a landmark abstained -- start_src / end_src record which.",
+  "sql": "SELECT * FROM (\nSELECT\n  CAST(s.stage_num AS TEXT) AS window_label,\n  CAST(s.stage_start_ts AS TIMESTAMP) AS start_ts,\n  CAST(s.stage_end_ts AS TIMESTAMP) AS end_ts,\n  '#8B5CF6' AS color,\n  CAST(0 AS DOUBLE PRECISION) AS sample_count\nFROM featurestore:nextier_titanium_substage_index_sept3_v2 s\nWHERE COALESCE(NULLIF(CAST(:stage_model AS TEXT), ''), 'silver') = 'titanium'\n  AND s.well_name = :well_name\n  AND s.stage_num IS NOT NULL\n  AND s.stage_start_ts IS NOT NULL AND s.stage_end_ts IS NOT NULL\n  AND CAST(s.stage_start_ts AS TIMESTAMP) <= CAST(:end_time AS TIMESTAMP)\n  AND CAST(s.stage_end_ts AS TIMESTAMP) >= CAST(:start_time AS TIMESTAMP)\n  AND CAST(s.stage_start_ts AS TIMESTAMP) <= CAST(s.stage_end_ts AS TIMESTAMP)\n) q\nORDER BY start_ts, CAST(window_label AS DOUBLE PRECISION)",
+  "valueSchema": {
+    "type": "object",
+    "properties": {
+      "window_label": {
+        "type": "string"
+      },
+      "start_ts": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "end_ts": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "color": {
+        "type": "string"
+      },
+      "sample_count": {
+        "type": "number"
+      }
+    },
+    "required": []
+  },
+  "paramsSchema": {
+    "type": "object",
+    "properties": {
+      "well_name": {
+        "type": "string"
+      },
+      "start_time": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "end_time": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "stage_model": {
+        "type": "string",
+        "default": "silver",
+        "enum": [
+          "silver",
+          "titanium"
+        ]
+      }
+    },
+    "required": [
+      "well_name",
+      "start_time",
+      "end_time"
+    ]
+  }
+}

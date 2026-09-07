@@ -3,6 +3,7 @@
   "displayName": "Anomaly Threshold Tuning",
   "description": "Tune DESIGN/slurry delta thresholds using compact precomputed counts.",
   "order": 32,
+  "group": "Others",
   "config": {
     "updateInterval": "5m",
     "specVersion": "v2"

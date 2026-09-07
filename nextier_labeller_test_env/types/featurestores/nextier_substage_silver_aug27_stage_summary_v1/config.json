@@ -1,0 +1,151 @@
+{
+  "key": "nextier_substage_silver_aug27_stage_summary_v1",
+  "displayName": "Nextier Substage Silver Aug27 Stage Summary V1",
+  "description": "Stage-level Silver Aug27 substage landmark summaries emitted by the DS substage labeling algorithm.",
+  "sql": "SELECT CAST(NULL AS TEXT) AS auto_stage_uid, fleet_name, pad_name, name AS well_name, id AS well_id, api_num, CAST(NULL AS DOUBLE PRECISION) AS stage_num, CAST(NULL AS DOUBLE PRECISION) AS copper_continuous, CAST(NULL AS TEXT) AS stage_start_ts, CAST(NULL AS TEXT) AS stage_end_ts, CAST(NULL AS TEXT) AS source_min_record_ts, CAST(NULL AS TEXT) AS source_max_record_ts, CAST(NULL AS TEXT) AS open_well_ts, CAST(NULL AS TEXT) AS auto_stage_start_ts, CAST(NULL AS TEXT) AS ttr_ts, CAST(NULL AS TEXT) AS auto_stage_end_ts, CAST(NULL AS TEXT) AS close_well_ts, CAST(NULL AS TEXT) AS rampdown_trigger_ts, CAST(NULL AS TEXT) AS last_pump_ts, CAST(NULL AS TEXT) AS pad_start_ts, CAST(NULL AS TEXT) AS pad_end_ts, CAST(NULL AS TEXT) AS slurry_start_ts, CAST(NULL AS TEXT) AS slurry_end_ts, CAST(NULL AS TEXT) AS flush_start_ts, CAST(NULL AS TEXT) AS flush_end_ts, CAST(NULL AS BOOLEAN) AS stage_closed, CAST(NULL AS BOOLEAN) AS mid_confirmed, CAST(NULL AS TEXT) AS stage_start_source, CAST(NULL AS TEXT) AS concentration_feature, CAST(NULL AS TEXT) AS conc_col, CAST(NULL AS DOUBLE PRECISION) AS resolved_design_rate, CAST(NULL AS DOUBLE PRECISION) AS source_row_count, CAST(NULL AS DOUBLE PRECISION) AS label_row_count, CAST(NULL AS TEXT) AS source_signature, CAST(NULL AS TEXT) AS algorithm_version, CAST(NULL AS TEXT) AS source_mode, CAST(NULL AS TEXT) AS processed_at FROM datastore:merged_fleet_stream_customer_full_v2 WHERE 1 = 0",
+  "checkpoint_fields": [],
+  "upsert": true,
+  "dataSchema": {
+    "type": "object",
+    "properties": {
+      "auto_stage_uid": {
+        "type": "string",
+        "metadata": {
+          "isPrimaryKey": true
+        }
+      },
+      "fleet_name": {
+        "type": "string"
+      },
+      "pad_name": {
+        "type": "string"
+      },
+      "well_name": {
+        "type": "string"
+      },
+      "well_id": {
+        "type": "string"
+      },
+      "api_num": {
+        "type": "string"
+      },
+      "stage_num": {
+        "type": "number"
+      },
+      "copper_continuous": {
+        "type": "number"
+      },
+      "stage_start_ts": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "stage_end_ts": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "source_min_record_ts": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "source_max_record_ts": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "open_well_ts": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "auto_stage_start_ts": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "ttr_ts": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "auto_stage_end_ts": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "close_well_ts": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "rampdown_trigger_ts": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "last_pump_ts": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "pad_start_ts": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "pad_end_ts": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "slurry_start_ts": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "slurry_end_ts": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "flush_start_ts": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "flush_end_ts": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "stage_closed": {
+        "type": "boolean"
+      },
+      "mid_confirmed": {
+        "type": "boolean"
+      },
+      "stage_start_source": {
+        "type": "string"
+      },
+      "concentration_feature": {
+        "type": "string"
+      },
+      "conc_col": {
+        "type": "string"
+      },
+      "resolved_design_rate": {
+        "type": "number"
+      },
+      "source_row_count": {
+        "type": "number"
+      },
+      "label_row_count": {
+        "type": "number"
+      },
+      "source_signature": {
+        "type": "string"
+      },
+      "algorithm_version": {
+        "type": "string"
+      },
+      "source_mode": {
+        "type": "string"
+      },
+      "processed_at": {
+        "type": "string",
+        "format": "date-time"
+      }
+    },
+    "required": [
+      "auto_stage_uid",
+      "well_name",
+      "stage_num",
+      "source_row_count"
+    ]
+  }
+}

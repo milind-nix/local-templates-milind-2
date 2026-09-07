@@ -12,7 +12,6 @@ from nixdlt.workflow_sdk.platform_tasks import (
     get_state,
     query_store,
     set_state,
-    write_datastore,
     write_featurestore,
 )
 
@@ -22,86 +21,15 @@ if str(_WORKFLOWS_DIR) not in sys.path:
     sys.path.insert(0, str(_WORKFLOWS_DIR))
 
 from nextier_live_stage_processing import main as live_stage_processing
-from nextier_merged_well_recompute import main as merged_well_recompute
 
 
-LIVE_SOURCE_DATASTORE_KEY = "live_fleet_stream_customer_full_v1"
 MERGED_SOURCE_DATASTORE_KEY = "merged_fleet_stream_customer_full_v2"
-WELL_INDEX_FEATURESTORE_KEY = "merged_well_index_v1"
 TARGET_FEATURESTORE_KEY = "merged_td_stage_index_v1"
 BRONZE_LABELS_FEATURESTORE_KEY = "merged_bronze_labels_v1"
 GOLD_LABELS_FEATURESTORE_KEY = "merged_gold_labels_v1"
 PLATINUM_LABELS_FEATURESTORE_KEY = "merged_platinum_labels_v1"
 CHECKPOINT_KEY = "__checkpoint__merged_live_stage_created_ts"
 TD_STATE_KEY = "merged_td_stage_state_by_well"
-
-
-def _well_names_from_frame(df: pl.DataFrame) -> list[str]:
-    if df.is_empty() or "name" not in df.columns:
-        return []
-    return sorted({str(name) for name in df["name"].drop_nulls().to_list()})
-
-
-def _values_cte(values: list[str], key_prefix: str) -> tuple[str, dict[str, str]]:
-    params: dict[str, str] = {}
-    selects: list[str] = []
-    for idx, value in enumerate(values):
-        key = f"{key_prefix}_{idx}"
-        params[key] = value
-        selects.append(f"SELECT :{key} AS name")
-    return " UNION ALL ".join(selects), params
-
-
-async def _refresh_merged_well_index_for_wells(
-    workspace_id: int,
-    well_names: list[str],
-) -> int:
-    if not well_names:
-        return 0
-
-    cte_sql, params = _values_cte(well_names, "well_index_name")
-    raw_df = await query_store(
-        sql=f"""
-            WITH target_wells AS (
-              {cte_sql}
-            )
-            SELECT
-              t.created_ts,
-              t.fleet_name,
-              t.pad_name,
-              t.record_ts,
-              t.name,
-              t.id,
-              t.api_num
-            FROM datastore:{MERGED_SOURCE_DATASTORE_KEY} t
-            JOIN target_wells w
-              ON t.name = w.name
-            WHERE
-              t.created_ts IS NOT NULL
-              AND t.record_ts IS NOT NULL
-              AND t.name IS NOT NULL
-            ORDER BY
-              t.name ASC,
-              t.record_ts ASC,
-              t.created_ts ASC
-        """,
-        workspace_id=workspace_id,
-        params=params,
-    )
-    if raw_df.is_empty():
-        return 0
-
-    well_index = merged_well_recompute._build_well_index(raw_df)
-    if well_index.is_empty():
-        return 0
-
-    await write_featurestore(
-        featurestore_key=WELL_INDEX_FEATURESTORE_KEY,
-        workspace_id=workspace_id,
-        df=well_index,
-        upsert=True,
-    )
-    return len(well_index)
 
 
 @flow(name="nextier-merged-live-processing")
@@ -130,12 +58,12 @@ async def nextier_merged_live_processing_flow(
               prop_conc_blend_auger,
               prop_conc_inline,
               press_mainline
-            FROM datastore:{LIVE_SOURCE_DATASTORE_KEY}
+            FROM datastore:{MERGED_SOURCE_DATASTORE_KEY}
             WHERE
               created_ts IS NOT NULL
               AND record_ts IS NOT NULL
               AND name IS NOT NULL
-              AND created_ts > :{CHECKPOINT_KEY}
+              AND (CAST(:{CHECKPOINT_KEY} AS timestamp) IS NULL OR CAST(created_ts AS timestamp) > CAST(:{CHECKPOINT_KEY} AS timestamp))
             ORDER BY
               created_ts ASC,
               record_ts ASC,
@@ -147,24 +75,16 @@ async def nextier_merged_live_processing_flow(
     )
 
     if raw_live_df.is_empty():
-        logger.info("No new live telemetry rows to merge and process")
+        logger.info("No new merged telemetry rows to process")
         return {
-            "rows_seeded": 0,
             "rows_processed": 0,
             "stage_windows_upserted": 0,
-            "well_index_rows_upserted": 0,
         }
 
     logger.info(
-        "Seeding merged raw datastore=%s rows=%s",
+        "Processing merged raw telemetry datastore=%s rows=%s",
         MERGED_SOURCE_DATASTORE_KEY,
         len(raw_live_df),
-    )
-    await write_datastore(
-        datastore_key=MERGED_SOURCE_DATASTORE_KEY,
-        workspace_id=workspace_id,
-        df=raw_live_df,
-        upsert=True,
     )
 
     existing_windows = await query_store(
@@ -193,13 +113,17 @@ async def nextier_merged_live_processing_flow(
         workspace_id=workspace_id,
     )
 
+    effective_td_state = live_stage_processing.reconcile_td_state_with_existing_windows(
+        td_state_by_well=state.get(TD_STATE_KEY) or {},
+        existing_windows=existing_windows,
+    )
     normal_raw_df, late_raw_df = live_stage_processing.split_late_telemetry_rows(
         raw_df=raw_live_df,
-        td_state_by_well=state.get(TD_STATE_KEY) or {},
+        td_state_by_well=effective_td_state,
     )
     classified_normal_df, next_td_state = live_stage_processing.assign_td_stages(
         raw_df=normal_raw_df,
-        td_state_by_well=state.get(TD_STATE_KEY) or {},
+        td_state_by_well=effective_td_state,
         td_gap_seconds=int(td_gap_seconds),
     )
     classified_late_df, repair_wells = (
@@ -462,16 +386,6 @@ async def nextier_merged_live_processing_flow(
                 )
             next_td_state.update(repair_td_state)
 
-    affected_wells = sorted(
-        set(_well_names_from_frame(raw_live_df))
-        | set(_well_names_from_frame(windows_to_write))
-        | set(repair_wells)
-    )
-    well_index_rows = await _refresh_merged_well_index_for_wells(
-        workspace_id=workspace_id,
-        well_names=affected_wells,
-    )
-
     checkpoint = raw_live_df["created_ts"].max()
     await set_state(
         workflow_id=workflow_id,
@@ -487,7 +401,7 @@ async def nextier_merged_live_processing_flow(
     )
 
     logger.info(
-        "Merged live processed rows=%s windows=%s bronze=%s platinum=%s gold=%s repair_wells=%s repair_windows=%s well_index_rows=%s checkpoint=%s",
+        "Merged live processed rows=%s windows=%s bronze=%s platinum=%s gold=%s repair_wells=%s repair_windows=%s checkpoint=%s",
         len(raw_live_df),
         len(windows_to_write),
         len(bronze_labels),
@@ -495,11 +409,9 @@ async def nextier_merged_live_processing_flow(
         len(gold_labels),
         len(repair_wells),
         len(repair_stage_windows),
-        well_index_rows,
         checkpoint,
     )
     return {
-        "rows_seeded": len(raw_live_df),
         "rows_processed": len(raw_live_df),
         "stage_windows_upserted": len(windows_to_write),
         "bronze_labels_upserted": len(bronze_labels),
@@ -510,6 +422,5 @@ async def nextier_merged_live_processing_flow(
         "repair_bronze_labels_rewritten": len(repair_bronze_labels),
         "repair_platinum_labels_rewritten": len(repair_platinum_labels),
         "repair_gold_labels_rewritten": len(repair_gold_labels),
-        "well_index_rows_upserted": well_index_rows,
         CHECKPOINT_KEY: str(checkpoint),
     }

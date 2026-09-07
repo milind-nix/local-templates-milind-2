@@ -1,0 +1,50 @@
+{
+  "key": "merged_detection_stage_options_v1",
+  "displayName": "Merged Detection Stage Options",
+  "description": "Model-aware stage options for the Substage Detection dashboard. Silver layers use the authoritative copper/silver stage index; Gold/Platinum use TD stages.",
+  "sql": "SELECT * FROM (SELECT label, value, stage_start_ts, stage_end_ts, sample_count FROM (SELECT CAST(s.stage_num AS DOUBLE PRECISION) AS label, CAST(s.stage_num AS DOUBLE PRECISION) AS value, s.stage_start_ts, s.stage_end_ts, s.sample_count FROM featurestore:nextier_copper_stage_index_v1 s WHERE CAST(:model AS TEXT) IN ('copper', 'copper_beta', 'substage_silver_aug18', 'substage_silver_aug27') AND s.well_name = :well_name UNION ALL SELECT CAST(r.stage_num AS DOUBLE PRECISION) AS label, CAST(r.stage_num AS DOUBLE PRECISION) AS value, CAST(r.stage_start_ts AS TIMESTAMP) AS stage_start_ts, CAST(r.stage_end_ts AS TIMESTAMP) AS stage_end_ts, CAST(NULL AS DOUBLE PRECISION) AS sample_count FROM featurestore:nextier_titanium_substage_index_sept3_v2 r WHERE CAST(:model AS TEXT) = 'sapphire' AND r.well_name = :well_name UNION ALL SELECT CAST(t.stage_num_td AS DOUBLE PRECISION) AS label, CAST(t.stage_num_td AS DOUBLE PRECISION) AS value, t.stage_start_ts, t.stage_end_ts, t.sample_count FROM featurestore:merged_td_stage_index_v1 t WHERE CAST(:model AS TEXT) NOT IN ('copper', 'copper_beta', 'substage_silver_aug18', 'substage_silver_aug27', 'sapphire') AND t.name = :well_name) options ORDER BY value) q",
+  "valueSchema": {
+    "type": "object",
+    "properties": {
+      "label": {
+        "type": "number"
+      },
+      "value": {
+        "type": "number"
+      },
+      "stage_start_ts": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "stage_end_ts": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "sample_count": {
+        "type": "number"
+      }
+    },
+    "required": []
+  },
+  "paramsSchema": {
+    "type": "object",
+    "properties": {
+      "well_name": {
+        "type": "string"
+      },
+      "model": {
+        "type": "string",
+        "default": "substage_silver_aug18"
+      },
+      "concentration_feature": {
+        "type": "string",
+        "default": "auger"
+      }
+    },
+    "required": [
+      "well_name",
+      "model",
+      "concentration_feature"
+    ]
+  }
+}

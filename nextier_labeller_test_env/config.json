@@ -1,6 +1,6 @@
 {
     "key": "nextier_labeller_test_env",
     "displayName": "Nextier Labeller",
-    "description": "Nextier labeller production template",
+    "description": "Nextier labeller production template ",
     "tags": ["labelling", "prediction"]
 }

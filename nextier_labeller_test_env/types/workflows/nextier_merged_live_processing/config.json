@@ -1,7 +1,7 @@
 {
   "key": "nextier_merged_live_processing",
   "displayName": "Nextier Merged Live Processing",
-  "description": "Incrementally seeds live telemetry into merged raw data and derives merged TD stage windows plus Bronze/Platinum/Gold labels.",
+  "description": "Derives merged TD stage windows plus Bronze/Platinum/Gold labels from merged raw telemetry.",
   "runtime": "prefect",
   "flow": {
     "entrypoint": "scripts/workflows/nextier_merged_live_processing/main.py:nextier_merged_live_processing_flow",
@@ -10,7 +10,11 @@
       "scripts/workflows/nextier_live_stage_processing/**/*.py",
       "scripts/workflows/nextier_merged_well_recompute/**/*.py"
     ],
-    "tags": ["nextier", "merged-labeller", "live-processing"]
+    "tags": [
+      "nextier",
+      "merged-labeller",
+      "live-processing"
+    ]
   },
   "deployment": {
     "workPool": "default",
@@ -20,7 +24,8 @@
     "parameters": {
       "batch_limit": 200000,
       "td_gap_seconds": 3600
-    }
+    },
+    "concurrencyCollisionStrategy": "CANCEL_NEW"
   },
   "paramsSchema": {
     "type": "object",

@@ -9,7 +9,11 @@
       "scripts/workflows/nextier_merged_well_recompute/**/*.py",
       "scripts/workflows/nextier_live_stage_processing/**/*.py"
     ],
-    "tags": ["nextier", "merged-labeller", "well-recompute"]
+    "tags": [
+      "nextier",
+      "merged-labeller",
+      "well-recompute"
+    ]
   },
   "deployment": {
     "workPool": "default",
@@ -21,7 +25,8 @@
       "td_gap_seconds": 3600,
       "dry_run": true,
       "reset_checkpoint": false
-    }
+    },
+    "concurrencyCollisionStrategy": "CANCEL_NEW"
   },
   "paramsSchema": {
     "type": "object",
@@ -32,7 +37,11 @@
       "well_source": {
         "type": "string",
         "default": "poc_well_index",
-        "enum": ["poc_well_index", "poc_raw", "merged_raw"]
+        "enum": [
+          "poc_well_index",
+          "poc_raw",
+          "merged_raw"
+        ]
       },
       "max_wells": {
         "type": "integer",

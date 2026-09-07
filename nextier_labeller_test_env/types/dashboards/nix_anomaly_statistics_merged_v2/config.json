@@ -3,6 +3,7 @@
   "displayName": "Anomaly Statistics",
   "description": "Active-run anomaly segment statistics and drilldown.",
   "order": 31,
+  "group": "Others",
   "config": {
     "updateInterval": "5m",
     "specVersion": "v2"

@@ -178,6 +178,48 @@ def assign_td_stages(
     return pl.from_pandas(df), next_state
 
 
+@task(name="reconcile-td-state-with-existing-windows")
+def reconcile_td_state_with_existing_windows(
+    td_state_by_well: dict[str, dict[str, Any]],
+    existing_windows: pl.DataFrame,
+) -> dict[str, dict[str, Any]]:
+    """Keep TD state at least as current as the persisted stage index."""
+    next_state = dict(td_state_by_well or {})
+    if existing_windows.is_empty():
+        return next_state
+
+    windows_df = existing_windows.to_pandas()
+    if windows_df.empty:
+        return next_state
+
+    windows_df["stage_end_ts"] = pd.to_datetime(
+        windows_df["stage_end_ts"],
+        errors="coerce",
+    )
+    windows_df = windows_df.dropna(
+        subset=["name", "stage_num_td", "stage_end_ts"],
+    )
+    if windows_df.empty:
+        return next_state
+
+    for well_name, group in windows_df.groupby("name", sort=False):
+        group = group.sort_values(["stage_end_ts", "stage_num_td"], kind="mergesort")
+        latest = group.iloc[-1]
+        latest_end = latest["stage_end_ts"]
+        latest_stage = int(latest["stage_num_td"])
+        previous = next_state.get(str(well_name), {})
+        previous_record_ts = pd.to_datetime(
+            previous.get("last_record_ts"),
+            errors="coerce",
+        )
+        if pd.isna(previous_record_ts) or latest_end > previous_record_ts:
+            next_state[str(well_name)] = {
+                "last_record_ts": _format_dt(latest_end),
+                "last_stage_num_td": latest_stage,
+            }
+    return next_state
+
+
 @task(name="split-late-telemetry-rows")
 def split_late_telemetry_rows(
     raw_df: pl.DataFrame,
@@ -893,13 +935,17 @@ async def nextier_live_stage_processing_flow(
         """,
         workspace_id=workspace_id,
     )
+    effective_td_state = reconcile_td_state_with_existing_windows(
+        td_state_by_well=state.get(TD_STATE_KEY) or {},
+        existing_windows=existing_windows,
+    )
     normal_raw_df, late_raw_df = split_late_telemetry_rows(
         raw_df=raw_df,
-        td_state_by_well=state.get(TD_STATE_KEY) or {},
+        td_state_by_well=effective_td_state,
     )
     classified_normal_df, next_td_state = assign_td_stages(
         raw_df=normal_raw_df,
-        td_state_by_well=state.get(TD_STATE_KEY) or {},
+        td_state_by_well=effective_td_state,
         td_gap_seconds=int(td_gap_seconds),
     )
     classified_late_df, repair_wells = assign_late_rows_to_existing_stages(

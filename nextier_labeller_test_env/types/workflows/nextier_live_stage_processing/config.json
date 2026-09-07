@@ -5,8 +5,13 @@
   "runtime": "prefect",
   "flow": {
     "entrypoint": "scripts/workflows/nextier_live_stage_processing/main.py:nextier_live_stage_processing_flow",
-    "include": ["scripts/workflows/nextier_live_stage_processing/**/*.py"],
-    "tags": ["nextier", "live-stage-processing"]
+    "include": [
+      "scripts/workflows/nextier_live_stage_processing/**/*.py"
+    ],
+    "tags": [
+      "nextier",
+      "live-stage-processing"
+    ]
   },
   "deployment": {
     "workPool": "default",
@@ -16,7 +21,8 @@
     "parameters": {
       "batch_limit": 200000,
       "td_gap_seconds": 3600
-    }
+    },
+    "concurrencyCollisionStrategy": "CANCEL_NEW"
   },
   "paramsSchema": {
     "type": "object",

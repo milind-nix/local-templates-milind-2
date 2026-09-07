@@ -1,8 +1,9 @@
 {
   "key": "nix_stage_segmentation_merged_v1",
   "displayName": "Stage Detection Dashboard",
-  "description": "Merged whole-well stage segmentation comparison dashboard with TD segmentation and stage_num ground truth.",
-  "order": 6,
+  "description": "Stage detection comparison dashboard using copper continuous stage windows against ground truth.",
+  "order": 7,
+  "group": "Stage",
   "config": {
     "updateInterval": "5m",
     "specVersion": "v2"
@@ -62,6 +63,10 @@
         "context_minutes": {
           "type": "number",
           "default": 0
+        },
+        "stage_model": {
+          "type": "string",
+          "default": "silver"
         }
       }
     },
@@ -491,17 +496,42 @@
                         "size": "sm"
                       }
                     }
+                  },
+                  "stage_model": {
+                    "type": "string",
+                    "default": "silver",
+                    "metadata": {
+                      "ui": {
+                        "label": "Stage Model",
+                        "component": "select",
+                        "options": [
+                          {
+                            "label": "Silver",
+                            "value": "silver"
+                          },
+                          {
+                            "label": "Titanium (Beta)",
+                            "value": "titanium"
+                          }
+                        ],
+                        "onChangeEventId": "stage_model_changed",
+                        "labelPlacement": "outside-left",
+                        "size": "sm"
+                      }
+                    }
                   }
                 },
                 "required": [
                   "chart_mode",
-                  "concentration_feature"
+                  "concentration_feature",
+                  "stage_model"
                 ],
                 "additionalProperties": false
               },
               "formData": {
                 "chart_mode": "{{state.chart_mode}}",
-                "concentration_feature": "{{state.concentration_feature}}"
+                "concentration_feature": "{{state.concentration_feature}}",
+                "stage_model": "{{state.stage_model}}"
               },
               "layout": {
                 "cols": 12,
@@ -517,6 +547,11 @@
                       {
                         "type": "field",
                         "key": "concentration_feature",
+                        "colSpan": 2
+                      },
+                      {
+                        "type": "field",
+                        "key": "stage_model",
                         "colSpan": 2
                       }
                     ]
@@ -548,12 +583,20 @@
                 "concentration_feature": "{{form.concentration_feature}}"
               }
             }
+          ],
+          "stage_model_changed": [
+            {
+              "type": "set_state",
+              "updates": {
+                "stage_model": "{{form.stage_model}}"
+              }
+            }
           ]
         }
       },
       {
         "id": "td_segmentation_chart",
-        "title": "Stage Segmentation \u2014 TD (top) vs Ground Truth (bottom)",
+        "title": "Stage Segmentation — Model Stages (top) vs Ground Truth (bottom)",
         "description": "Merged stage segmentation windows over whole-well telemetry.",
         "isDataLarge": true,
         "chrome": {
@@ -594,18 +637,20 @@
           },
           "td_windows": {
             "source": "metric",
-            "metricKey": "merged_td_stage_segmentation_windows_v1",
+            "metricKey": "nextier_copper_continuous_stage_windows_v1",
             "fieldName": "window_label,start_ts,end_ts,color,sample_count",
             "bindings": {
               "query": {
                 "well_name": "well_name",
                 "start_time": "start_time",
-                "end_time": "end_time"
+                "end_time": "end_time",
+                "stage_model": "stage_model"
               },
               "required": [
                 "well_name",
                 "start_time",
-                "end_time"
+                "end_time",
+                "stage_model"
               ]
             }
           },
@@ -625,6 +670,63 @@
                 "end_time"
               ]
             }
+          },
+          "td_confirmed_windows": {
+            "source": "metric",
+            "metricKey": "nextier_copper_confirmed_stage_windows_v1",
+            "fieldName": "window_label,start_ts,end_ts,color,sample_count",
+            "bindings": {
+              "query": {
+                "well_name": "well_name",
+                "start_time": "start_time",
+                "end_time": "end_time",
+                "stage_model": "stage_model"
+              },
+              "required": [
+                "well_name",
+                "start_time",
+                "end_time",
+                "stage_model"
+              ]
+            }
+          },
+          "td_provisional_windows": {
+            "source": "metric",
+            "metricKey": "nextier_copper_provisional_stage_windows_v1",
+            "fieldName": "window_label,start_ts,end_ts,color,sample_count",
+            "bindings": {
+              "query": {
+                "well_name": "well_name",
+                "start_time": "start_time",
+                "end_time": "end_time",
+                "stage_model": "stage_model"
+              },
+              "required": [
+                "well_name",
+                "start_time",
+                "end_time",
+                "stage_model"
+              ]
+            }
+          },
+          "td_refined_windows": {
+            "source": "metric",
+            "metricKey": "nextier_titanium_substage_stage_windows_v1",
+            "fieldName": "window_label,start_ts,end_ts,color,sample_count",
+            "bindings": {
+              "query": {
+                "well_name": "well_name",
+                "start_time": "start_time",
+                "end_time": "end_time",
+                "stage_model": "stage_model"
+              },
+              "required": [
+                "well_name",
+                "start_time",
+                "end_time",
+                "stage_model"
+              ]
+            }
           }
         },
         "renderConfig": {
@@ -638,17 +740,17 @@
                   {
                     "yAxisId": "Y_pressure",
                     "label": "Pressure",
-                    "persist": false
+                    "persist": true
                   },
                   {
                     "yAxisId": "Y_rate",
                     "label": "Slurry Rate",
-                    "persist": false
+                    "persist": true
                   },
                   {
                     "yAxisId": "Y_conc",
                     "label": "Concentration",
-                    "persist": false
+                    "persist": true
                   }
                 ]
               },
@@ -659,14 +761,14 @@
                     "left": 90,
                     "right": 150,
                     "bottom": "53%",
-                    "containLabel": true
+                    "containLabel": false
                   },
                   {
                     "top": "49%",
                     "left": 90,
                     "right": 150,
                     "bottom": 84,
-                    "containLabel": true
+                    "containLabel": false
                   }
                 ],
                 "xAxis": [
@@ -1016,7 +1118,61 @@
                     }
                   },
                   {
-                    "name": "TD Windows",
+                    "name": "Provisional / First Stage",
+                    "type": "line",
+                    "data": [],
+                    "xAxisId": "X_td",
+                    "yAxisId": "Y_pressure",
+                    "symbol": "none",
+                    "lineStyle": {
+                      "opacity": 0
+                    },
+                    "markArea": {
+                      "silent": true,
+                      "data": "function:windowMarkAreaV2(data=data:td_provisional_windows, labelField=window_label, startField=start_ts, endField=end_ts, colorField=color, minLabelDurationSec=300, opacity=0.07)",
+                      "label": {
+                        "show": true,
+                        "position": "insideTop",
+                        "color": "rgba(15, 23, 42, 0.58)",
+                        "fontSize": 10,
+                        "fontWeight": 600,
+                        "overflow": "truncate"
+                      }
+                    },
+                    "color": "#F59E0B",
+                    "itemStyle": {
+                      "color": "#F59E0B"
+                    }
+                  },
+                  {
+                    "name": "Confirmed Stage",
+                    "type": "line",
+                    "data": [],
+                    "xAxisId": "X_td",
+                    "yAxisId": "Y_pressure",
+                    "symbol": "none",
+                    "lineStyle": {
+                      "opacity": 0
+                    },
+                    "markArea": {
+                      "silent": true,
+                      "data": "function:windowMarkAreaV2(data=data:td_confirmed_windows, labelField=window_label, startField=start_ts, endField=end_ts, colorField=color, minLabelDurationSec=300, opacity=0.1)",
+                      "label": {
+                        "show": true,
+                        "position": "insideTop",
+                        "color": "rgba(15, 23, 42, 0.58)",
+                        "fontSize": 10,
+                        "fontWeight": 600,
+                        "overflow": "truncate"
+                      }
+                    },
+                    "color": "#60A5FA",
+                    "itemStyle": {
+                      "color": "#60A5FA"
+                    }
+                  },
+                  {
+                    "name": "Continuous / Final Stage",
                     "type": "line",
                     "data": [],
                     "xAxisId": "X_td",
@@ -1037,9 +1193,9 @@
                         "overflow": "truncate"
                       }
                     },
-                    "color": "#D9902F",
+                    "color": "#14B8A6",
                     "itemStyle": {
-                      "color": "#D9902F"
+                      "color": "#14B8A6"
                     }
                   },
                   {
@@ -1175,6 +1331,33 @@
                     "emphasis": {
                       "disabled": true
                     }
+                  },
+                  {
+                    "name": "Substage Refined Stage",
+                    "type": "line",
+                    "data": [],
+                    "xAxisId": "X_td",
+                    "yAxisId": "Y_pressure",
+                    "symbol": "none",
+                    "lineStyle": {
+                      "opacity": 0
+                    },
+                    "markArea": {
+                      "silent": true,
+                      "data": "function:windowMarkAreaV2(data=data:td_refined_windows, labelField=window_label, startField=start_ts, endField=end_ts, colorField=color, minLabelDurationSec=300, opacity=0.16)",
+                      "label": {
+                        "show": true,
+                        "position": "insideTop",
+                        "color": "rgba(15, 23, 42, 0.72)",
+                        "fontSize": 11,
+                        "fontWeight": 600,
+                        "overflow": "truncate"
+                      }
+                    },
+                    "color": "#14B8A6",
+                    "itemStyle": {
+                      "color": "#8B5CF6"
+                    }
                   }
                 ],
                 "legend": {
@@ -1202,11 +1385,94 @@
                       "itemStyle": {
                         "opacity": 0
                       }
-                    },
-                    "TD Windows",
-                    "GT Windows"
+                    }
                   ]
-                }
+                },
+                "graphic": [
+                  {
+                    "type": "group",
+                    "left": "center",
+                    "top": 34,
+                    "silent": true,
+                    "children": [
+                      {
+                        "type": "rect",
+                        "left": 0,
+                        "top": 4,
+                        "shape": {
+                          "width": 18,
+                          "height": 8,
+                          "r": 2
+                        },
+                        "style": {
+                          "fill": "#14B8A6",
+                          "opacity": 0.7
+                        }
+                      },
+                      {
+                        "type": "text",
+                        "left": 24,
+                        "top": 0,
+                        "style": {
+                          "text": "Continuous",
+                          "fill": "rgba(71, 85, 105, 0.95)",
+                          "fontSize": 12,
+                          "fontWeight": 600
+                        }
+                      },
+                      {
+                        "type": "rect",
+                        "left": 112,
+                        "top": 4,
+                        "shape": {
+                          "width": 18,
+                          "height": 8,
+                          "r": 2
+                        },
+                        "style": {
+                          "fill": "#60A5FA",
+                          "opacity": 0.7
+                        }
+                      },
+                      {
+                        "type": "text",
+                        "left": 136,
+                        "top": 0,
+                        "style": {
+                          "text": "Confirmed",
+                          "fill": "rgba(71, 85, 105, 0.95)",
+                          "fontSize": 12,
+                          "fontWeight": 600
+                        }
+                      },
+                      {
+                        "type": "rect",
+                        "left": 218,
+                        "top": 4,
+                        "shape": {
+                          "width": 18,
+                          "height": 8,
+                          "r": 2
+                        },
+                        "style": {
+                          "fill": "#F59E0B",
+                          "opacity": 0.7
+                        }
+                      },
+                      {
+                        "type": "text",
+                        "left": 242,
+                        "top": 0,
+                        "style": {
+                          "text": "Provisional",
+                          "fill": "rgba(71, 85, 105, 0.95)",
+                          "fontSize": 12,
+                          "fontWeight": 600
+                        }
+                      }
+                    ]
+                  }
+                ]
               }
             }
           },
@@ -1254,7 +1520,14 @@
                 "td_segmentation_chart__zoom__loaded_end_time": "{{event.zoom_load_end_time}}",
                 "td_segmentation_chart__zoom__loaded_resolution": "{{event.zoom_resolution}}",
                 "td_segmentation_chart__zoom__history": "{{event.zoom_history}}",
-                "td_segmentation_chart__zoom__history_index": "{{event.zoom_history_index}}"
+                "td_segmentation_chart__zoom__history_index": "{{event.zoom_history_index}}",
+                "td_segmentation_chart_scatter__zoom__visible_start_time": "{{event.zoom_start_time}}",
+                "td_segmentation_chart_scatter__zoom__visible_end_time": "{{event.zoom_end_time}}",
+                "td_segmentation_chart_scatter__zoom__loaded_start_time": "{{event.zoom_load_start_time}}",
+                "td_segmentation_chart_scatter__zoom__loaded_end_time": "{{event.zoom_load_end_time}}",
+                "td_segmentation_chart_scatter__zoom__loaded_resolution": "{{event.zoom_resolution}}",
+                "td_segmentation_chart_scatter__zoom__history": "{{event.zoom_history}}",
+                "td_segmentation_chart_scatter__zoom__history_index": "{{event.zoom_history_index}}"
               }
             },
             {
@@ -1271,7 +1544,14 @@
                 "td_segmentation_chart__zoom__loaded_end_time": "{{state.end_time}}",
                 "td_segmentation_chart__zoom__loaded_resolution": "__AUTO__",
                 "td_segmentation_chart__zoom__history": "{{event.zoom_history}}",
-                "td_segmentation_chart__zoom__history_index": "{{event.zoom_history_index}}"
+                "td_segmentation_chart__zoom__history_index": "{{event.zoom_history_index}}",
+                "td_segmentation_chart_scatter__zoom__visible_start_time": "{{state.start_time}}",
+                "td_segmentation_chart_scatter__zoom__visible_end_time": "{{state.end_time}}",
+                "td_segmentation_chart_scatter__zoom__loaded_start_time": "{{state.start_time}}",
+                "td_segmentation_chart_scatter__zoom__loaded_end_time": "{{state.end_time}}",
+                "td_segmentation_chart_scatter__zoom__loaded_resolution": "__AUTO__",
+                "td_segmentation_chart_scatter__zoom__history": "{{event.zoom_history}}",
+                "td_segmentation_chart_scatter__zoom__history_index": "{{event.zoom_history_index}}"
               }
             }
           ]
@@ -1279,7 +1559,7 @@
       },
       {
         "id": "td_segmentation_chart_scatter",
-        "title": "Stage Segmentation \u2014 TD (top) vs Ground Truth (bottom)",
+        "title": "Stage Segmentation — Model Stages (top) vs Ground Truth (bottom)",
         "description": "Merged stage segmentation windows over whole-well telemetry.",
         "isDataLarge": true,
         "chrome": {
@@ -1320,18 +1600,20 @@
           },
           "td_windows": {
             "source": "metric",
-            "metricKey": "merged_td_stage_segmentation_windows_v1",
+            "metricKey": "nextier_copper_continuous_stage_windows_v1",
             "fieldName": "window_label,start_ts,end_ts,color,sample_count",
             "bindings": {
               "query": {
                 "well_name": "well_name",
                 "start_time": "start_time",
-                "end_time": "end_time"
+                "end_time": "end_time",
+                "stage_model": "stage_model"
               },
               "required": [
                 "well_name",
                 "start_time",
-                "end_time"
+                "end_time",
+                "stage_model"
               ]
             }
           },
@@ -1351,6 +1633,63 @@
                 "end_time"
               ]
             }
+          },
+          "td_confirmed_windows": {
+            "source": "metric",
+            "metricKey": "nextier_copper_confirmed_stage_windows_v1",
+            "fieldName": "window_label,start_ts,end_ts,color,sample_count",
+            "bindings": {
+              "query": {
+                "well_name": "well_name",
+                "start_time": "start_time",
+                "end_time": "end_time",
+                "stage_model": "stage_model"
+              },
+              "required": [
+                "well_name",
+                "start_time",
+                "end_time",
+                "stage_model"
+              ]
+            }
+          },
+          "td_provisional_windows": {
+            "source": "metric",
+            "metricKey": "nextier_copper_provisional_stage_windows_v1",
+            "fieldName": "window_label,start_ts,end_ts,color,sample_count",
+            "bindings": {
+              "query": {
+                "well_name": "well_name",
+                "start_time": "start_time",
+                "end_time": "end_time",
+                "stage_model": "stage_model"
+              },
+              "required": [
+                "well_name",
+                "start_time",
+                "end_time",
+                "stage_model"
+              ]
+            }
+          },
+          "td_refined_windows": {
+            "source": "metric",
+            "metricKey": "nextier_titanium_substage_stage_windows_v1",
+            "fieldName": "window_label,start_ts,end_ts,color,sample_count",
+            "bindings": {
+              "query": {
+                "well_name": "well_name",
+                "start_time": "start_time",
+                "end_time": "end_time",
+                "stage_model": "stage_model"
+              },
+              "required": [
+                "well_name",
+                "start_time",
+                "end_time",
+                "stage_model"
+              ]
+            }
           }
         },
         "renderConfig": {
@@ -1364,17 +1703,17 @@
                   {
                     "yAxisId": "Y_pressure",
                     "label": "Pressure",
-                    "persist": false
+                    "persist": true
                   },
                   {
                     "yAxisId": "Y_rate",
                     "label": "Slurry Rate",
-                    "persist": false
+                    "persist": true
                   },
                   {
                     "yAxisId": "Y_conc",
                     "label": "Concentration",
-                    "persist": false
+                    "persist": true
                   }
                 ]
               },
@@ -1385,14 +1724,14 @@
                     "left": 90,
                     "right": 150,
                     "bottom": "53%",
-                    "containLabel": true
+                    "containLabel": false
                   },
                   {
                     "top": "49%",
                     "left": 90,
                     "right": 150,
                     "bottom": 84,
-                    "containLabel": true
+                    "containLabel": false
                   }
                 ],
                 "xAxis": [
@@ -1739,7 +2078,61 @@
                     }
                   },
                   {
-                    "name": "TD Windows",
+                    "name": "Provisional / First Stage",
+                    "type": "line",
+                    "data": [],
+                    "xAxisId": "X_td",
+                    "yAxisId": "Y_pressure",
+                    "symbol": "none",
+                    "lineStyle": {
+                      "opacity": 0
+                    },
+                    "markArea": {
+                      "silent": true,
+                      "data": "function:windowMarkAreaV2(data=data:td_provisional_windows, labelField=window_label, startField=start_ts, endField=end_ts, colorField=color, minLabelDurationSec=300, opacity=0.07)",
+                      "label": {
+                        "show": true,
+                        "position": "insideTop",
+                        "color": "rgba(15, 23, 42, 0.58)",
+                        "fontSize": 10,
+                        "fontWeight": 600,
+                        "overflow": "truncate"
+                      }
+                    },
+                    "color": "#F59E0B",
+                    "itemStyle": {
+                      "color": "#F59E0B"
+                    }
+                  },
+                  {
+                    "name": "Confirmed Stage",
+                    "type": "line",
+                    "data": [],
+                    "xAxisId": "X_td",
+                    "yAxisId": "Y_pressure",
+                    "symbol": "none",
+                    "lineStyle": {
+                      "opacity": 0
+                    },
+                    "markArea": {
+                      "silent": true,
+                      "data": "function:windowMarkAreaV2(data=data:td_confirmed_windows, labelField=window_label, startField=start_ts, endField=end_ts, colorField=color, minLabelDurationSec=300, opacity=0.1)",
+                      "label": {
+                        "show": true,
+                        "position": "insideTop",
+                        "color": "rgba(15, 23, 42, 0.58)",
+                        "fontSize": 10,
+                        "fontWeight": 600,
+                        "overflow": "truncate"
+                      }
+                    },
+                    "color": "#60A5FA",
+                    "itemStyle": {
+                      "color": "#60A5FA"
+                    }
+                  },
+                  {
+                    "name": "Continuous / Final Stage",
                     "type": "line",
                     "data": [],
                     "xAxisId": "X_td",
@@ -1760,9 +2153,9 @@
                         "overflow": "truncate"
                       }
                     },
-                    "color": "#D9902F",
+                    "color": "#14B8A6",
                     "itemStyle": {
-                      "color": "#D9902F"
+                      "color": "#14B8A6"
                     }
                   },
                   {
@@ -1895,6 +2288,33 @@
                     "emphasis": {
                       "disabled": true
                     }
+                  },
+                  {
+                    "name": "Substage Refined Stage",
+                    "type": "line",
+                    "data": [],
+                    "xAxisId": "X_td",
+                    "yAxisId": "Y_pressure",
+                    "symbol": "none",
+                    "lineStyle": {
+                      "opacity": 0
+                    },
+                    "markArea": {
+                      "silent": true,
+                      "data": "function:windowMarkAreaV2(data=data:td_refined_windows, labelField=window_label, startField=start_ts, endField=end_ts, colorField=color, minLabelDurationSec=300, opacity=0.16)",
+                      "label": {
+                        "show": true,
+                        "position": "insideTop",
+                        "color": "rgba(15, 23, 42, 0.72)",
+                        "fontSize": 11,
+                        "fontWeight": 600,
+                        "overflow": "truncate"
+                      }
+                    },
+                    "color": "#14B8A6",
+                    "itemStyle": {
+                      "color": "#8B5CF6"
+                    }
                   }
                 ],
                 "legend": {
@@ -1907,11 +2327,94 @@
                   "data": [
                     "Pressure (psi)",
                     "Rate (bpm)",
-                    "Concentration (ppa)",
-                    "TD Windows",
-                    "GT Windows"
+                    "Concentration (ppa)"
                   ]
-                }
+                },
+                "graphic": [
+                  {
+                    "type": "group",
+                    "left": "center",
+                    "top": 34,
+                    "silent": true,
+                    "children": [
+                      {
+                        "type": "rect",
+                        "left": 0,
+                        "top": 4,
+                        "shape": {
+                          "width": 18,
+                          "height": 8,
+                          "r": 2
+                        },
+                        "style": {
+                          "fill": "#14B8A6",
+                          "opacity": 0.7
+                        }
+                      },
+                      {
+                        "type": "text",
+                        "left": 24,
+                        "top": 0,
+                        "style": {
+                          "text": "Continuous",
+                          "fill": "rgba(71, 85, 105, 0.95)",
+                          "fontSize": 12,
+                          "fontWeight": 600
+                        }
+                      },
+                      {
+                        "type": "rect",
+                        "left": 112,
+                        "top": 4,
+                        "shape": {
+                          "width": 18,
+                          "height": 8,
+                          "r": 2
+                        },
+                        "style": {
+                          "fill": "#60A5FA",
+                          "opacity": 0.7
+                        }
+                      },
+                      {
+                        "type": "text",
+                        "left": 136,
+                        "top": 0,
+                        "style": {
+                          "text": "Confirmed",
+                          "fill": "rgba(71, 85, 105, 0.95)",
+                          "fontSize": 12,
+                          "fontWeight": 600
+                        }
+                      },
+                      {
+                        "type": "rect",
+                        "left": 218,
+                        "top": 4,
+                        "shape": {
+                          "width": 18,
+                          "height": 8,
+                          "r": 2
+                        },
+                        "style": {
+                          "fill": "#F59E0B",
+                          "opacity": 0.7
+                        }
+                      },
+                      {
+                        "type": "text",
+                        "left": 242,
+                        "top": 0,
+                        "style": {
+                          "text": "Provisional",
+                          "fill": "rgba(71, 85, 105, 0.95)",
+                          "fontSize": 12,
+                          "fontWeight": 600
+                        }
+                      }
+                    ]
+                  }
+                ]
               }
             }
           },
@@ -1953,6 +2456,13 @@
                 "value": false
               },
               "updates": {
+                "td_segmentation_chart__zoom__visible_start_time": "{{event.zoom_start_time}}",
+                "td_segmentation_chart__zoom__visible_end_time": "{{event.zoom_end_time}}",
+                "td_segmentation_chart__zoom__loaded_start_time": "{{event.zoom_load_start_time}}",
+                "td_segmentation_chart__zoom__loaded_end_time": "{{event.zoom_load_end_time}}",
+                "td_segmentation_chart__zoom__loaded_resolution": "{{event.zoom_resolution}}",
+                "td_segmentation_chart__zoom__history": "{{event.zoom_history}}",
+                "td_segmentation_chart__zoom__history_index": "{{event.zoom_history_index}}",
                 "td_segmentation_chart_scatter__zoom__visible_start_time": "{{event.zoom_start_time}}",
                 "td_segmentation_chart_scatter__zoom__visible_end_time": "{{event.zoom_end_time}}",
                 "td_segmentation_chart_scatter__zoom__loaded_start_time": "{{event.zoom_load_start_time}}",
@@ -1970,6 +2480,13 @@
                 "value": true
               },
               "updates": {
+                "td_segmentation_chart__zoom__visible_start_time": "{{state.start_time}}",
+                "td_segmentation_chart__zoom__visible_end_time": "{{state.end_time}}",
+                "td_segmentation_chart__zoom__loaded_start_time": "{{state.start_time}}",
+                "td_segmentation_chart__zoom__loaded_end_time": "{{state.end_time}}",
+                "td_segmentation_chart__zoom__loaded_resolution": "__AUTO__",
+                "td_segmentation_chart__zoom__history": "{{event.zoom_history}}",
+                "td_segmentation_chart__zoom__history_index": "{{event.zoom_history_index}}",
                 "td_segmentation_chart_scatter__zoom__visible_start_time": "{{state.start_time}}",
                 "td_segmentation_chart_scatter__zoom__visible_end_time": "{{state.end_time}}",
                 "td_segmentation_chart_scatter__zoom__loaded_start_time": "{{state.start_time}}",
@@ -1986,7 +2503,7 @@
     "views": [
       {
         "id": "main",
-        "title": "Nix Stage Detection Dashboard (Merged)",
+        "title": "Stage Detection Dashboard",
         "presentation": {
           "type": "page"
         },

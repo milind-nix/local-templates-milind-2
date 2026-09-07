@@ -1,0 +1,191 @@
+{
+  "key": "nextier_substage_sapphire_sept3_stage_summary_v2",
+  "displayName": "Nextier Substage Sapphire Sept3 Stage Summary V2",
+  "description": "Per-stage substage landmark placements from the Sapphire layer -- the doc calls these 'placements'. One row per coarse titanium stage, seven landmarks wide, each with the detector that placed it and its abstention flag. Same shape and purpose as nextier_substage_silver_aug27_stage_summary_v1, for the titanium/sapphire chain instead of the copper/auto one.",
+  "sql": "SELECT CAST(NULL AS TEXT) AS sapphire_stage_uid, fleet_name AS fleet_name, pad_name AS pad_name, name AS well_name, id AS well_id, api_num AS api_num, CAST(NULL AS DOUBLE PRECISION) AS stage_num, CAST(NULL AS TEXT) AS titanium_stage_uid, CAST(NULL AS TEXT) AS stage_source, CAST(NULL AS TEXT) AS stage_start_ts, CAST(NULL AS TEXT) AS stage_end_ts, CAST(NULL AS TEXT) AS open_well_ts, CAST(NULL AS TEXT) AS open_well_src, CAST(NULL AS TEXT) AS open_well_abstain_reason, CAST(NULL AS TEXT) AS sapphire_stage_start_ts, CAST(NULL AS TEXT) AS sapphire_stage_start_src, CAST(NULL AS TEXT) AS sapphire_stage_start_abstain_reason, CAST(NULL AS TEXT) AS pad_end_ts, CAST(NULL AS TEXT) AS pad_end_src, CAST(NULL AS TEXT) AS pad_end_abstain_reason, CAST(NULL AS TEXT) AS ttr_ts, CAST(NULL AS TEXT) AS ttr_src, CAST(NULL AS TEXT) AS ttr_abstain_reason, CAST(NULL AS TEXT) AS slurry_end_ts, CAST(NULL AS TEXT) AS slurry_end_src, CAST(NULL AS TEXT) AS slurry_end_abstain_reason, CAST(NULL AS TEXT) AS sapphire_stage_end_ts, CAST(NULL AS TEXT) AS sapphire_stage_end_src, CAST(NULL AS TEXT) AS sapphire_stage_end_abstain_reason, CAST(NULL AS TEXT) AS close_well_ts, CAST(NULL AS TEXT) AS close_well_src, CAST(NULL AS TEXT) AS close_well_abstain_reason, CAST(NULL AS TEXT) AS well_family, CAST(NULL AS TEXT) AS concentration_feature, CAST(NULL AS TEXT) AS conc_col, CAST(NULL AS DOUBLE PRECISION) AS n_stages, CAST(NULL AS DOUBLE PRECISION) AS mass_klb, CAST(NULL AS DOUBLE PRECISION) AS label_row_count, CAST(NULL AS TEXT) AS algorithm_version, CAST(NULL AS TEXT) AS source_mode, CAST(NULL AS TEXT) AS run_id, CAST(NULL AS TEXT) AS processed_at FROM datastore:merged_fleet_stream_customer_full_v2 WHERE 1 = 0",
+  "checkpoint_fields": [],
+  "upsert": true,
+  "dataSchema": {
+    "type": "object",
+    "properties": {
+      "sapphire_stage_uid": {
+        "type": "string",
+        "description": "Synthetic per-stage id: well:stage_num:algorithm_version. Surrogate rather than the natural key so a second algorithm version lands beside the first instead of overwriting it.",
+        "metadata": {
+          "isPrimaryKey": true
+        }
+      },
+      "fleet_name": {
+        "type": "string",
+        "description": "Fleet the well belongs to."
+      },
+      "pad_name": {
+        "type": "string",
+        "description": "Pad the well belongs to."
+      },
+      "well_name": {
+        "type": "string",
+        "description": "Well the stage belongs to."
+      },
+      "well_id": {
+        "type": "string",
+        "description": "Well id from the source stream."
+      },
+      "api_num": {
+        "type": "string",
+        "description": "API number."
+      },
+      "stage_num": {
+        "type": "number",
+        "description": "Coarse titanium stage ordinal."
+      },
+      "titanium_stage_uid": {
+        "type": "string",
+        "description": "The titanium stage index row these landmarks were placed on, so the join back to the coarse tier is explicit."
+      },
+      "stage_source": {
+        "type": "string",
+        "description": "Titanium split that supplied the coarse window: 'final' (default, post-stage authoritative) or 'first' (causal)."
+      },
+      "stage_start_ts": {
+        "type": "string",
+        "description": "Coarse window start from titanium."
+      },
+      "stage_end_ts": {
+        "type": "string",
+        "description": "Coarse window end from titanium."
+      },
+      "open_well_ts": {
+        "type": "string",
+        "description": "Placed timestamp for the open_well landmark. Null when abstained."
+      },
+      "open_well_src": {
+        "type": "string",
+        "description": "Detector that placed open_well."
+      },
+      "open_well_abstain_reason": {
+        "type": "string",
+        "description": "Why open_well was not placed, verbatim from the detector (e.g. 'no causal rate reference yet'). NULL means it was placed. An abstention is a decision, and this is the only record of why."
+      },
+      "sapphire_stage_start_ts": {
+        "type": "string",
+        "description": "Placed timestamp for the stage_start landmark. Null when abstained."
+      },
+      "sapphire_stage_start_src": {
+        "type": "string",
+        "description": "Detector that placed stage_start."
+      },
+      "sapphire_stage_start_abstain_reason": {
+        "type": "string",
+        "description": "Why stage_start was not placed, verbatim from the detector (e.g. 'no causal rate reference yet'). NULL means it was placed. An abstention is a decision, and this is the only record of why."
+      },
+      "pad_end_ts": {
+        "type": "string",
+        "description": "Placed timestamp for the pad_end landmark. Null when abstained."
+      },
+      "pad_end_src": {
+        "type": "string",
+        "description": "Detector that placed pad_end."
+      },
+      "pad_end_abstain_reason": {
+        "type": "string",
+        "description": "Why pad_end was not placed, verbatim from the detector (e.g. 'no causal rate reference yet'). NULL means it was placed. An abstention is a decision, and this is the only record of why."
+      },
+      "ttr_ts": {
+        "type": "string",
+        "description": "Placed timestamp for the ttr landmark. Null when abstained."
+      },
+      "ttr_src": {
+        "type": "string",
+        "description": "Detector that placed ttr."
+      },
+      "ttr_abstain_reason": {
+        "type": "string",
+        "description": "Why ttr was not placed, verbatim from the detector (e.g. 'no causal rate reference yet'). NULL means it was placed. An abstention is a decision, and this is the only record of why."
+      },
+      "slurry_end_ts": {
+        "type": "string",
+        "description": "Placed timestamp for the slurry_end landmark. Null when abstained."
+      },
+      "slurry_end_src": {
+        "type": "string",
+        "description": "Detector that placed slurry_end."
+      },
+      "slurry_end_abstain_reason": {
+        "type": "string",
+        "description": "Why slurry_end was not placed, verbatim from the detector (e.g. 'no causal rate reference yet'). NULL means it was placed. An abstention is a decision, and this is the only record of why."
+      },
+      "sapphire_stage_end_ts": {
+        "type": "string",
+        "description": "Placed timestamp for the stage_end landmark. Null when abstained."
+      },
+      "sapphire_stage_end_src": {
+        "type": "string",
+        "description": "Detector that placed stage_end."
+      },
+      "sapphire_stage_end_abstain_reason": {
+        "type": "string",
+        "description": "Why stage_end was not placed, verbatim from the detector (e.g. 'no causal rate reference yet'). NULL means it was placed. An abstention is a decision, and this is the only record of why."
+      },
+      "close_well_ts": {
+        "type": "string",
+        "description": "Placed timestamp for the close_well landmark. Null when abstained."
+      },
+      "close_well_src": {
+        "type": "string",
+        "description": "Detector that placed close_well."
+      },
+      "close_well_abstain_reason": {
+        "type": "string",
+        "description": "Why close_well was not placed, verbatim from the detector (e.g. 'no causal rate reference yet'). NULL means it was placed. An abstention is a decision, and this is the only record of why."
+      },
+      "well_family": {
+        "type": "string",
+        "description": "Well family sapphire resolved for detector tuning."
+      },
+      "concentration_feature": {
+        "type": "string",
+        "description": "Requested concentration feature (auger/denso/inline/target)."
+      },
+      "conc_col": {
+        "type": "string",
+        "description": "Concentration column actually used, or null when none was available -- several landmarks abstain without it."
+      },
+      "n_stages": {
+        "type": "number",
+        "description": "Stage count in the well frame sapphire saw."
+      },
+      "mass_klb": {
+        "type": "number",
+        "description": "Sand mass for this stage, klb."
+      },
+      "label_row_count": {
+        "type": "number",
+        "description": "Row-level labels emitted for this stage."
+      },
+      "algorithm_version": {
+        "type": "string",
+        "description": "Sapphire algorithm version."
+      },
+      "source_mode": {
+        "type": "string",
+        "description": "live / background / historical."
+      },
+      "run_id": {
+        "type": "string",
+        "description": "Workflow run that wrote the row."
+      },
+      "processed_at": {
+        "type": "string",
+        "description": "When the row was written."
+      }
+    },
+    "required": [
+      "sapphire_stage_uid",
+      "well_name",
+      "stage_num",
+      "stage_start_ts",
+      "stage_end_ts"
+    ]
+  }
+}

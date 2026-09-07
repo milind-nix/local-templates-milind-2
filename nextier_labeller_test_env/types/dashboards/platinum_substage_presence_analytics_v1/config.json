@@ -3,6 +3,7 @@
   "displayName": "Platinum Substage Presence Analytics",
   "description": "Platinum-label coverage, missing-label analysis, and stage drilldown.",
   "order": 30,
+  "group": "Others",
   "config": {
     "updateInterval": "5m",
     "specVersion": "v2"

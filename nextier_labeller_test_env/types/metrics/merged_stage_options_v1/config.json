@@ -2,7 +2,7 @@
   "key": "merged_stage_options_v1",
   "displayName": "Merged Stage Options",
   "description": "Live TD stage options and windows for the selected well.",
-  "sql": "SELECT * FROM (SELECT stage_num_td AS label, stage_num_td AS value, stage_start_ts, stage_end_ts, sample_count FROM featurestore:merged_td_stage_index_v1 WHERE name = :well_name ORDER BY stage_num_td) q",
+  "sql": "SELECT * FROM (\nSELECT\n  stage_num AS label,\n  stage_num AS value,\n  COALESCE(CAST(s.continuous_start_ts AS timestamp), CAST(s.stage_start_ts AS timestamp)) AS stage_start_ts,\n  COALESCE(CAST(s.continuous_end_ts AS timestamp), CAST(s.stage_end_ts AS timestamp)) AS stage_end_ts,\n  sample_count\nFROM featurestore:nextier_copper_stage_index_v1 s\nWHERE well_name = :well_name\n  AND stage_num IS NOT NULL\n  AND COALESCE(CAST(s.continuous_start_ts AS timestamp), CAST(s.stage_start_ts AS timestamp)) IS NOT NULL\n  AND COALESCE(CAST(s.continuous_end_ts AS timestamp), CAST(s.stage_end_ts AS timestamp)) IS NOT NULL\nORDER BY stage_num\n) q",
   "valueSchema": {
     "type": "object",
     "properties": {

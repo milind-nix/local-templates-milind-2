@@ -1,0 +1,120 @@
+{
+  "key": "nextier_substage_silver_aug18_processing_manifest_v1",
+  "displayName": "Nextier Auto Beta Processing Manifest V1",
+  "description": "Processing manifest for beta 2 Auto substage labeling runs.",
+  "sql": "SELECT CAST(NULL AS TEXT) AS manifest_id, CAST(NULL AS TEXT) AS run_id, CAST(NULL AS TEXT) AS workflow_name, CAST(NULL AS TEXT) AS mode, CAST(NULL AS TEXT) AS fleet_name, CAST(NULL AS TEXT) AS pad_name, CAST(NULL AS TEXT) AS well_name, CAST(NULL AS DOUBLE PRECISION) AS stage_num, CAST(NULL AS DOUBLE PRECISION) AS copper_continuous, CAST(NULL AS TEXT) AS copper_stage_uid, CAST(NULL AS TEXT) AS concentration_feature, CAST(NULL AS TEXT) AS requested_start_ts, CAST(NULL AS TEXT) AS requested_end_ts, CAST(NULL AS TEXT) AS effective_start_ts, CAST(NULL AS TEXT) AS effective_end_ts, CAST(NULL AS TEXT) AS source_copper_featurestore_key, CAST(NULL AS TEXT) AS auto_labels_featurestore_key, CAST(NULL AS TEXT) AS auto_summary_featurestore_key, CAST(NULL AS TEXT) AS source_signature, CAST(NULL AS DOUBLE PRECISION) AS source_row_count, CAST(NULL AS DOUBLE PRECISION) AS label_rows_written, CAST(NULL AS DOUBLE PRECISION) AS summary_rows_written, CAST(NULL AS BOOLEAN) AS stage_closed, CAST(NULL AS BOOLEAN) AS mid_confirmed, CAST(NULL AS TEXT) AS algorithm_version, CAST(NULL AS BOOLEAN) AS dry_run, CAST(NULL AS TEXT) AS status, CAST(NULL AS TEXT) AS error_message, CAST(NULL AS TEXT) AS started_at, CAST(NULL AS TEXT) AS completed_at FROM datastore:merged_fleet_stream_customer_full_v2 WHERE 1 = 0",
+  "checkpoint_fields": [],
+  "upsert": true,
+  "dataSchema": {
+    "type": "object",
+    "properties": {
+      "manifest_id": {
+        "type": "string",
+        "metadata": {
+          "isPrimaryKey": true
+        }
+      },
+      "run_id": {
+        "type": "string"
+      },
+      "workflow_name": {
+        "type": "string"
+      },
+      "mode": {
+        "type": "string"
+      },
+      "fleet_name": {
+        "type": "string"
+      },
+      "pad_name": {
+        "type": "string"
+      },
+      "well_name": {
+        "type": "string"
+      },
+      "stage_num": {
+        "type": "number"
+      },
+      "copper_continuous": {
+        "type": "number"
+      },
+      "copper_stage_uid": {
+        "type": "string"
+      },
+      "concentration_feature": {
+        "type": "string"
+      },
+      "requested_start_ts": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "requested_end_ts": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "effective_start_ts": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "effective_end_ts": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "source_copper_featurestore_key": {
+        "type": "string"
+      },
+      "auto_labels_featurestore_key": {
+        "type": "string"
+      },
+      "auto_summary_featurestore_key": {
+        "type": "string"
+      },
+      "source_signature": {
+        "type": "string"
+      },
+      "source_row_count": {
+        "type": "number"
+      },
+      "label_rows_written": {
+        "type": "number"
+      },
+      "summary_rows_written": {
+        "type": "number"
+      },
+      "stage_closed": {
+        "type": "boolean"
+      },
+      "mid_confirmed": {
+        "type": "boolean"
+      },
+      "algorithm_version": {
+        "type": "string"
+      },
+      "dry_run": {
+        "type": "boolean"
+      },
+      "status": {
+        "type": "string"
+      },
+      "error_message": {
+        "type": "string"
+      },
+      "started_at": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "completed_at": {
+        "type": "string",
+        "format": "date-time"
+      }
+    },
+    "required": [
+      "manifest_id",
+      "workflow_name",
+      "mode",
+      "well_name",
+      "status",
+      "started_at"
+    ]
+  }
+}

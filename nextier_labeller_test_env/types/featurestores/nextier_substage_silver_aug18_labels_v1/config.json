@@ -1,0 +1,89 @@
+{
+  "key": "nextier_substage_silver_aug18_labels_v1",
+  "displayName": "Nextier Auto Beta Labels V1",
+  "description": "Row-level beta 2 Auto substage labels derived from silver/copper tip windows using DS Auto layer algorithms.",
+  "sql": "SELECT CAST(NULL AS TEXT) AS auto_label_id, CAST(NULL AS TEXT) AS telemetry_point_id, fleet_name, pad_name, name AS well_name, id AS well_id, api_num, record_ts, created_ts, CAST(NULL AS DOUBLE PRECISION) AS stage_num, CAST(NULL AS DOUBLE PRECISION) AS copper_continuous, CAST(NULL AS TEXT) AS substage_label, CAST(NULL AS TEXT) AS label_kind, CAST(NULL AS BOOLEAN) AS stage_closed, CAST(NULL AS BOOLEAN) AS mid_confirmed, CAST(NULL AS TEXT) AS stage_start_source, CAST(NULL AS TEXT) AS concentration_feature, CAST(NULL AS TEXT) AS conc_col, CAST(NULL AS TEXT) AS algorithm_version, CAST(NULL AS TEXT) AS source_mode, CAST(NULL AS TEXT) AS processed_at FROM datastore:merged_fleet_stream_customer_full_v2 WHERE 1 = 0",
+  "checkpoint_fields": [],
+  "upsert": true,
+  "dataSchema": {
+    "type": "object",
+    "properties": {
+      "auto_label_id": {
+        "type": "string",
+        "metadata": {
+          "isPrimaryKey": true
+        }
+      },
+      "telemetry_point_id": {
+        "type": "string"
+      },
+      "fleet_name": {
+        "type": "string"
+      },
+      "pad_name": {
+        "type": "string"
+      },
+      "well_name": {
+        "type": "string"
+      },
+      "well_id": {
+        "type": "string"
+      },
+      "api_num": {
+        "type": "string"
+      },
+      "record_ts": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "created_ts": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "stage_num": {
+        "type": "number"
+      },
+      "copper_continuous": {
+        "type": "number"
+      },
+      "substage_label": {
+        "type": "string"
+      },
+      "label_kind": {
+        "type": "string"
+      },
+      "stage_closed": {
+        "type": "boolean"
+      },
+      "mid_confirmed": {
+        "type": "boolean"
+      },
+      "stage_start_source": {
+        "type": "string"
+      },
+      "concentration_feature": {
+        "type": "string"
+      },
+      "conc_col": {
+        "type": "string"
+      },
+      "algorithm_version": {
+        "type": "string"
+      },
+      "source_mode": {
+        "type": "string"
+      },
+      "processed_at": {
+        "type": "string",
+        "format": "date-time"
+      }
+    },
+    "required": [
+      "auto_label_id",
+      "telemetry_point_id",
+      "well_name",
+      "record_ts",
+      "substage_label"
+    ]
+  }
+}

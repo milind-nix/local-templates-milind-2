@@ -1,0 +1,112 @@
+{
+  "key": "merged_pad_manual_stage_group_markers_v1",
+  "displayName": "Merged Pad Manual Stage Group Markers",
+  "description": "Returns the individual manual annotation markers contained inside a selected manual stage group.",
+  "sql": "SELECT * FROM ( SELECT a.annotation_id, a.layer_id, a.rule_concept_id, a.name AS well_name, a.stage_num, a.substage_name, a.start_time, a.end_time, COALESCE(a.timestamp, a.start_time) AS timestamp, a.start_feature, a.end_feature, a.selected_feature, a.annotation_type, a.labeler_id, a.notes, COALESCE(a.source_type, 'user') AS source_type, a.created_by_email, a.updated_by_email, true AS can_edit, COALESCE(a.status, 'active') AS status, a.created_at, a.updated_at, CAST(NULL AS TEXT) AS color FROM datastore:substage_annotations_v4 a WHERE COALESCE(a.status, 'active') = 'active' AND COALESCE(a.source_type, 'user') <> 'model' AND a.layer_id = CAST(:layer_id AS TEXT) AND a.name = CAST(:well_name AS TEXT) AND CAST(COALESCE(a.timestamp, a.start_time) AS TIMESTAMP) >= CAST(:start_time AS TIMESTAMP) AND CAST(COALESCE(a.timestamp, a.start_time) AS TIMESTAMP) <= CAST(:end_time AS TIMESTAMP) ORDER BY CAST(COALESCE(a.timestamp, a.start_time) AS TIMESTAMP), a.annotation_id ) q",
+  "valueSchema": {
+    "type": "object",
+    "properties": {
+      "annotation_id": {
+        "type": "string"
+      },
+      "layer_id": {
+        "type": "string"
+      },
+      "rule_concept_id": {
+        "type": "string"
+      },
+      "well_name": {
+        "type": "string"
+      },
+      "stage_num": {
+        "type": "number"
+      },
+      "substage_name": {
+        "type": "string"
+      },
+      "start_time": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "end_time": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "timestamp": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "start_feature": {
+        "type": "string"
+      },
+      "end_feature": {
+        "type": "string"
+      },
+      "selected_feature": {
+        "type": "string"
+      },
+      "annotation_type": {
+        "type": "string"
+      },
+      "labeler_id": {
+        "type": "string"
+      },
+      "notes": {
+        "type": "string"
+      },
+      "source_type": {
+        "type": "string"
+      },
+      "created_by_email": {
+        "type": "string"
+      },
+      "updated_by_email": {
+        "type": "string"
+      },
+      "can_edit": {
+        "type": "boolean"
+      },
+      "status": {
+        "type": "string"
+      },
+      "created_at": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "updated_at": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "color": {
+        "type": "string"
+      }
+    },
+    "required": []
+  },
+  "paramsSchema": {
+    "type": "object",
+    "properties": {
+      "layer_id": {
+        "type": "string"
+      },
+      "well_name": {
+        "type": "string"
+      },
+      "start_time": {
+        "type": "string"
+      },
+      "end_time": {
+        "type": "string"
+      },
+      "annotation_refresh_nonce": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "layer_id",
+      "well_name",
+      "start_time",
+      "end_time"
+    ]
+  }
+}

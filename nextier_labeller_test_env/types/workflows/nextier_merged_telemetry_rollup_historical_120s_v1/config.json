@@ -1,0 +1,96 @@
+{
+  "key": "nextier_merged_telemetry_rollup_historical_120s_v1",
+  "displayName": "Nextier Merged Telemetry Rollup Historical 120s",
+  "description": "Manual historical backfill for 120-second merged telemetry rollups.",
+  "runtime": "prefect",
+  "flow": {
+    "entrypoint": "scripts/workflows/nextier_merged_telemetry_rollup/main.py:nextier_merged_telemetry_rollup_flow",
+    "include": [
+      "scripts/workflows/nextier_merged_telemetry_rollup/**/*.py"
+    ],
+    "tags": [
+      "nextier",
+      "merged-labeller",
+      "telemetry-rollup",
+      "telemetry-rollup-120s",
+      "historical"
+    ]
+  },
+  "deployment": {
+    "workPool": "default",
+    "timezone": "UTC",
+    "concurrencyLimit": 1,
+    "parameters": {
+      "process_historical": true,
+      "bucket_seconds": 120,
+      "chunk_hours": 24,
+      "max_chunks": 15,
+      "lookback_minutes": 15,
+      "reset_backfill_cursor": false,
+      "reset_backfill_checkpoint": false
+    },
+    "concurrencyCollisionStrategy": "CANCEL_NEW"
+  },
+  "paramsSchema": {
+    "type": "object",
+    "properties": {
+      "process_historical": {
+        "type": "boolean",
+        "default": true
+      },
+      "start_time": {
+        "type": "string"
+      },
+      "end_time": {
+        "type": "string"
+      },
+      "backfill_start_time": {
+        "type": "string"
+      },
+      "backfill_end_time": {
+        "type": "string"
+      },
+      "reset_backfill_cursor": {
+        "type": "boolean",
+        "default": false
+      },
+      "reset_backfill_checkpoint": {
+        "type": "boolean",
+        "default": false
+      },
+      "lookback_minutes": {
+        "type": "integer",
+        "default": 15,
+        "minimum": 1
+      },
+      "bucket_seconds": {
+        "type": "integer",
+        "default": 120,
+        "minimum": 1
+      },
+      "chunk_hours": {
+        "type": "integer",
+        "default": 24,
+        "minimum": 1
+      },
+      "max_chunks": {
+        "type": "integer",
+        "default": 15,
+        "minimum": 1
+      },
+      "fleet_name": {
+        "type": "string"
+      },
+      "pad_name": {
+        "type": "string"
+      },
+      "well_name": {
+        "type": "string"
+      }
+    },
+    "required": []
+  },
+  "initialState": {
+    "__checkpoint__merged_telemetry_rollup_end_ts": null
+  }
+}

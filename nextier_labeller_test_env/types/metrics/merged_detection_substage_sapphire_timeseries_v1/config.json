@@ -1,0 +1,74 @@
+{
+  "key": "merged_detection_substage_sapphire_timeseries_v1",
+  "displayName": "Merged Detection Substage Sapphire Timeseries",
+  "description": "Selected-stage merged telemetry with Sapphire substage labels, over the substage-refined titanium window.",
+  "sql": "SELECT * FROM ( WITH stage_window AS ( SELECT well_name, CAST(stage_num AS DOUBLE PRECISION) AS stage_num, CAST(stage_start_ts AS timestamp) AS stage_start_ts, CAST(stage_end_ts AS timestamp) AS stage_end_ts FROM featurestore:nextier_titanium_substage_index_sept3_v2 WHERE well_name = :well_name AND CAST(stage_num AS DOUBLE PRECISION) = :stage_num LIMIT 1 ), bounds AS ( SELECT stage_start_ts - (:context_minutes || ' minutes')::interval AS c_start, stage_end_ts + (:context_minutes || ' minutes')::interval AS c_end FROM stage_window ), auto_labels AS ( SELECT a.well_name, CAST(a.record_ts AS timestamp) AS label_ts, a.substage_label FROM featurestore:nextier_substage_sapphire_sept3_labels_v2 a JOIN stage_window s ON s.well_name = a.well_name AND CAST(a.record_ts AS timestamp) >= s.stage_start_ts AND CAST(a.record_ts AS timestamp) <= s.stage_end_ts WHERE a.well_name = :well_name AND a.concentration_feature = :concentration_feature ), telemetry AS ( SELECT t.name AS well_name, CAST(s.stage_num AS DOUBLE PRECISION) AS stage_num, t.record_ts AS ts, a.substage_label, t.rate_slurry, t.press_mainline, CASE WHEN :concentration_feature = 'inline' THEN t.prop_conc_inline WHEN :concentration_feature = 'target' THEN t.prop_conc_target WHEN :concentration_feature = 'auger' THEN t.prop_conc_blend_auger ELSE t.prop_conc_blend_denso END AS selected_concentration, CAST(NULL AS DOUBLE PRECISION) AS inferred_pressure, CAST(NULL AS DOUBLE PRECISION) AS design_rate, CAST(NULL AS DOUBLE PRECISION) AS design_rate_high, CAST(NULL AS DOUBLE PRECISION) AS design_rate_rampdown, CAST(NULL AS DOUBLE PRECISION) AS context_anchor FROM stage_window s CROSS JOIN bounds b JOIN datastore:merged_fleet_stream_customer_full_v2 t ON t.name = s.well_name AND t.record_ts >= b.c_start AND t.record_ts <= b.c_end LEFT JOIN auto_labels a ON a.well_name = t.name AND a.label_ts = t.record_ts ), stage_breaks AS ( SELECT DISTINCT CAST(s.stage_end_ts AS timestamp) + INTERVAL '1 millisecond' AS break_ts FROM featurestore:nextier_titanium_substage_index_sept3_v2 s CROSS JOIN bounds b WHERE s.well_name = :well_name AND s.stage_end_ts IS NOT NULL AND CAST(s.stage_end_ts AS timestamp) >= b.c_start AND CAST(s.stage_end_ts AS timestamp) < b.c_end ), boundary_points AS ( SELECT CAST(:well_name AS TEXT) AS well_name, CAST(NULL AS DOUBLE PRECISION) AS stage_num, c_start AS ts, CAST(NULL AS TEXT) AS substage_label, CAST(NULL AS DOUBLE PRECISION) AS rate_slurry, CAST(NULL AS DOUBLE PRECISION) AS press_mainline, CAST(NULL AS DOUBLE PRECISION) AS selected_concentration, CAST(NULL AS DOUBLE PRECISION) AS inferred_pressure, CAST(NULL AS DOUBLE PRECISION) AS design_rate, CAST(NULL AS DOUBLE PRECISION) AS design_rate_high, CAST(NULL AS DOUBLE PRECISION) AS design_rate_rampdown, 0.0 AS context_anchor FROM bounds UNION ALL SELECT CAST(:well_name AS TEXT) AS well_name, CAST(NULL AS DOUBLE PRECISION) AS stage_num, c_end AS ts, CAST(NULL AS TEXT) AS substage_label, CAST(NULL AS DOUBLE PRECISION) AS rate_slurry, CAST(NULL AS DOUBLE PRECISION) AS press_mainline, CAST(NULL AS DOUBLE PRECISION) AS selected_concentration, CAST(NULL AS DOUBLE PRECISION) AS inferred_pressure, CAST(NULL AS DOUBLE PRECISION) AS design_rate, CAST(NULL AS DOUBLE PRECISION) AS design_rate_high, CAST(NULL AS DOUBLE PRECISION) AS design_rate_rampdown, 0.0 AS context_anchor FROM bounds ), line_breaks AS ( SELECT CAST(:well_name AS TEXT) AS well_name, CAST(NULL AS DOUBLE PRECISION) AS stage_num, break_ts AS ts, CAST(NULL AS TEXT) AS substage_label, CAST(NULL AS DOUBLE PRECISION) AS rate_slurry, CAST(NULL AS DOUBLE PRECISION) AS press_mainline, CAST(NULL AS DOUBLE PRECISION) AS selected_concentration, CAST(NULL AS DOUBLE PRECISION) AS inferred_pressure, CAST(NULL AS DOUBLE PRECISION) AS design_rate, CAST(NULL AS DOUBLE PRECISION) AS design_rate_high, CAST(NULL AS DOUBLE PRECISION) AS design_rate_rampdown, CAST(NULL AS DOUBLE PRECISION) AS context_anchor FROM stage_breaks ) SELECT * FROM telemetry UNION ALL SELECT * FROM boundary_points UNION ALL SELECT * FROM line_breaks ORDER BY ts ) q",
+  "valueSchema": {
+    "type": "object",
+    "properties": {
+      "ts": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "well_name": {
+        "type": "string"
+      },
+      "stage_num": {
+        "type": "number"
+      },
+      "substage_label": {
+        "type": "string"
+      },
+      "rate_slurry": {
+        "type": "number"
+      },
+      "press_mainline": {
+        "type": "number"
+      },
+      "selected_concentration": {
+        "type": "number"
+      },
+      "inferred_pressure": {
+        "type": "number"
+      },
+      "design_rate": {
+        "type": "number"
+      },
+      "design_rate_high": {
+        "type": "number"
+      },
+      "design_rate_rampdown": {
+        "type": "number"
+      },
+      "context_anchor": {
+        "type": "number"
+      }
+    },
+    "required": []
+  },
+  "paramsSchema": {
+    "type": "object",
+    "properties": {
+      "well_name": {
+        "type": "string"
+      },
+      "stage_num": {
+        "type": "number"
+      },
+      "concentration_feature": {
+        "type": "string",
+        "default": "auger"
+      },
+      "context_minutes": {
+        "type": "number",
+        "default": 0
+      }
+    },
+    "required": [
+      "well_name",
+      "stage_num",
+      "concentration_feature",
+      "context_minutes"
+    ]
+  }
+}

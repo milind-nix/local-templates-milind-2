@@ -1,0 +1,49 @@
+{
+  "key": "merged_detection_substage_silver_aug27_windows_v1",
+  "displayName": "Merged Detection Substage Silver Aug27 Windows",
+  "description": "Selected-stage merged telemetry with Silver Beta substage labels.",
+  "sql": "SELECT * FROM (WITH stage_window AS ( SELECT well_name, CAST(stage_num AS DOUBLE PRECISION) AS stage_num, CAST(stage_start_ts AS timestamp) AS stage_start_ts, CAST(stage_end_ts AS timestamp) AS stage_end_ts FROM featurestore:nextier_copper_stage_index_v1 WHERE well_name = :well_name AND CAST(stage_num AS DOUBLE PRECISION) = :stage_num LIMIT 1 ), base AS (SELECT a.substage_label, CAST(a.record_ts AS timestamp) AS ts FROM featurestore:nextier_substage_silver_aug27_labels_v1 a JOIN stage_window s ON s.well_name = a.well_name AND CAST(a.record_ts AS timestamp) >= s.stage_start_ts AND CAST(a.record_ts AS timestamp) <= s.stage_end_ts WHERE a.well_name = :well_name AND a.concentration_feature = :concentration_feature AND a.record_ts IS NOT NULL AND a.substage_label IS NOT NULL AND LOWER(a.substage_label) <> 'na'), marked AS (SELECT substage_label, ts, CASE WHEN LAG(substage_label) OVER (ORDER BY ts) IS DISTINCT FROM substage_label THEN 1 ELSE 0 END AS is_new_group FROM base), grouped AS (SELECT substage_label, ts, SUM(is_new_group) OVER (ORDER BY ts ROWS UNBOUNDED PRECEDING) AS group_id FROM marked) SELECT substage_label, MIN(ts) AS start_ts, MAX(ts) AS end_ts, CASE LOWER(substage_label) WHEN 'open_well' THEN '#2563EB' WHEN 'stage_start' THEN '#16A34A' WHEN 'ttr' THEN '#9333EA' WHEN 'pad' THEN '#F97316' WHEN 'slurry' THEN '#DC2626' WHEN 'flush' THEN '#0D9488' WHEN 'stage_end' THEN '#DB2777' WHEN 'close_well' THEN '#EAB308' ELSE '#787878' END AS color, COUNT(*) AS sample_count FROM grouped GROUP BY group_id, substage_label ORDER BY MIN(ts)) q",
+  "valueSchema": {
+    "type": "object",
+    "properties": {
+      "substage_label": {
+        "type": "string"
+      },
+      "start_ts": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "end_ts": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "color": {
+        "type": "string"
+      },
+      "sample_count": {
+        "type": "number"
+      }
+    },
+    "required": []
+  },
+  "paramsSchema": {
+    "type": "object",
+    "properties": {
+      "well_name": {
+        "type": "string"
+      },
+      "stage_num": {
+        "type": "number"
+      },
+      "concentration_feature": {
+        "type": "string",
+        "default": "auger"
+      }
+    },
+    "required": [
+      "well_name",
+      "stage_num",
+      "concentration_feature"
+    ]
+  }
+}

@@ -1,6 +1,6 @@
 {
   "key": "annotation_overlap_check_v1",
-  "displayName": "Annotation Overlap Check",
+  "displayName": "Annotation Overlap Check ",
   "description": "Counts active window annotations that overlap a candidate window annotation in the same layer.",
   "sql": "SELECT * FROM (SELECT COUNT(*) AS overlap_count FROM datastore:substage_annotations_v4 WHERE layer_id = :layer_id AND COALESCE(status, 'active') = 'active' AND annotation_type = 'window' AND annotation_id <> :annotation_id AND CAST(start_time AS timestamp) < CAST(:end_time AS timestamp) AND CAST(end_time AS timestamp) > CAST(:start_time AS timestamp)) q",
   "valueSchema": {

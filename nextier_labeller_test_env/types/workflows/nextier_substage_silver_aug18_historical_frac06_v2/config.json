@@ -1,0 +1,195 @@
+{
+  "key": "nextier_substage_silver_aug18_historical_frac06_v2",
+  "displayName": "Nextier Substage Silver Aug18 Labeling - Frac 06 V2",
+  "description": "Scheduled Silver Aug18 substage historical labeling for Frac 06 over silver/copper tip stage windows.",
+  "runtime": "prefect",
+  "flow": {
+    "entrypoint": "scripts/workflows/nextier_auto_labeling_v1/main.py:nextier_auto_labeling_v1_flow",
+    "include": [
+      "scripts/workflows/nextier_auto_labeling_v1/**/*.py",
+      "scripts/workflows/nextier_labeling_common_v1/**/*.py"
+    ],
+    "tags": [
+      "nextier",
+      "labeling",
+      "substage",
+      "substage-labeling",
+      "silver-aug18",
+      "historical",
+      "temp",
+      "frac-06",
+      "substage-detection-aug18"
+    ]
+  },
+  "deployment": {
+    "workPool": "nextier-backfill",
+    "timezone": "UTC",
+    "concurrencyLimit": 1,
+    "parameters": {
+      "mode": "historical",
+      "copper_featurestore_key": "nextier_copper_labels_v1",
+      "stage_index_featurestore_key": "nextier_copper_stage_index_v1",
+      "auto_labels_featurestore_key": "nextier_substage_silver_aug18_labels_v1",
+      "auto_summary_featurestore_key": "nextier_substage_silver_aug18_stage_summary_v1",
+      "auto_manifest_featurestore_key": "nextier_substage_silver_aug18_processing_manifest_v1",
+      "lookback_hours": 0,
+      "chunk_hours": 48,
+      "max_chunks": 10,
+      "max_wells": 30,
+      "max_stages": 100,
+      "skip_completed": true,
+      "delete_existing": false,
+      "dry_run": false,
+      "algorithm_version": "nextier_substage_silver_aug18_v1",
+      "concentration_feature": "all",
+      "use_copper_tip_selector": true,
+      "include_fleet_names": [
+        "Frac 06"
+      ]
+    },
+    "cron": "*/8 * * * *",
+    "concurrencyCollisionStrategy": "CANCEL_NEW"
+  },
+  "paramsSchema": {
+    "type": "object",
+    "properties": {
+      "mode": {
+        "type": "string",
+        "enum": [
+          "live",
+          "background",
+          "historical",
+          "debug"
+        ],
+        "default": "historical"
+      },
+      "copper_featurestore_key": {
+        "type": "string",
+        "default": "nextier_copper_labels_v1"
+      },
+      "stage_index_featurestore_key": {
+        "type": "string",
+        "default": "nextier_copper_stage_index_v1"
+      },
+      "auto_labels_featurestore_key": {
+        "type": "string",
+        "default": "nextier_substage_silver_aug18_labels_v1"
+      },
+      "auto_summary_featurestore_key": {
+        "type": "string",
+        "default": "nextier_substage_silver_aug18_stage_summary_v1"
+      },
+      "auto_manifest_featurestore_key": {
+        "type": "string",
+        "default": "nextier_substage_silver_aug18_processing_manifest_v1"
+      },
+      "well_name": {
+        "type": "string"
+      },
+      "well_names": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Optional explicit well names to process in one run."
+      },
+      "fleet_name": {
+        "type": "string"
+      },
+      "include_fleet_names": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Optional fleet names to include. Use this to partition Auto labeling runs by fleet."
+      },
+      "exclude_fleet_names": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Optional fleet names to exclude. Cannot be used with include_fleet_names."
+      },
+      "pad_name": {
+        "type": "string"
+      },
+      "stage_num": {
+        "type": "number"
+      },
+      "start_time": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "end_time": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "lookback_hours": {
+        "type": "number",
+        "minimum": 0,
+        "default": 0
+      },
+      "chunk_hours": {
+        "type": "number",
+        "minimum": 0.1,
+        "default": 48,
+        "description": "Historical cursor window size. Stages overlapping this window are selected, then processed using their full stage-index bounds."
+      },
+      "max_chunks": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100,
+        "default": 10,
+        "description": "Maximum empty historical windows to advance past in one run before processing the next pending window."
+      },
+      "max_wells": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 500,
+        "default": 30
+      },
+      "max_stages": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 1000,
+        "default": 100
+      },
+      "skip_completed": {
+        "type": "boolean",
+        "default": true
+      },
+      "delete_existing": {
+        "type": "boolean",
+        "default": false
+      },
+      "dry_run": {
+        "type": "boolean",
+        "default": false
+      },
+      "algorithm_version": {
+        "type": "string",
+        "default": "nextier_substage_silver_aug18_v1"
+      },
+      "concentration_feature": {
+        "type": "string",
+        "enum": [
+          "all",
+          "denso",
+          "inline",
+          "target",
+          "auger",
+          "auto"
+        ],
+        "default": "all",
+        "description": "Concentration channels used by the Auto labeler. all processes denso, inline, target, and auger in one run; auto lets the DS resolver choose one best channel."
+      },
+      "use_copper_tip_selector": {
+        "type": "boolean",
+        "default": true,
+        "description": "Use the DS copper-tip Auto entry point, which prefers continuous, then confirmed, then provisional stage windows."
+      }
+    },
+    "required": []
+  },
+  "initialState": {}
+}

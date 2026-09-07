@@ -9,7 +9,10 @@
       "scripts/workflows/nextier_live_well_repair/**/*.py",
       "scripts/workflows/nextier_live_stage_processing/**/*.py"
     ],
-    "tags": ["nextier", "live-stage-repair"]
+    "tags": [
+      "nextier",
+      "live-stage-repair"
+    ]
   },
   "deployment": {
     "workPool": "default",
@@ -17,7 +20,8 @@
     "concurrencyLimit": 1,
     "parameters": {
       "td_gap_seconds": 3600
-    }
+    },
+    "concurrencyCollisionStrategy": "CANCEL_NEW"
   },
   "paramsSchema": {
     "type": "object",
@@ -31,7 +35,9 @@
         "minimum": 1
       }
     },
-    "required": ["well_name"]
+    "required": [
+      "well_name"
+    ]
   },
   "initialState": {}
 }

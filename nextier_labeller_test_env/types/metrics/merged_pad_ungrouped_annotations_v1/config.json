@@ -1,0 +1,128 @@
+{
+  "key": "merged_pad_ungrouped_annotations_v1",
+  "displayName": "Ungrouped Annotations (Pad)",
+  "description": "Manual annotations for the selected pad/layer that fall OUTSIDE the time span of every derived manual stage group (orphan/ungrouped markers). Group spans are derived from the core window; the annotation list is padded by context_minutes.",
+  "sql": "SELECT * FROM ( WITH pad_wells AS (SELECT DISTINCT name FROM featurestore:merged_well_index_v1 WHERE COALESCE(NULLIF(fleet_name, ''), 'Unknown') = :fleet_name AND COALESCE(NULLIF(pad_name, ''), 'Unknown') = :pad_name), user_annotations AS (SELECT a.annotation_id, a.layer_id, a.rule_concept_id, a.name AS well_name, a.stage_num, a.substage_name, a.start_time, a.end_time, COALESCE(a.timestamp, a.start_time) AS timestamp, a.start_feature, a.end_feature, a.selected_feature, a.annotation_type, a.labeler_id, a.notes, COALESCE(a.source_type, 'user') AS source_type, a.created_by_email, a.updated_by_email, CASE WHEN a.layer_id = 'manual:shared' THEN true WHEN a.layer_id = 'manual:user:' || md5(CAST(:current_user_email AS TEXT)) THEN true WHEN EXISTS (SELECT 1 FROM datastore:substage_label_layers_v3 l WHERE l.layer_id = a.layer_id AND COALESCE(l.status, 'active') = 'active' AND COALESCE(l.is_editable, true) = true AND (l.owner_email = CAST(:current_user_email AS TEXT) OR l.created_by_email = CAST(:current_user_email AS TEXT))) THEN true ELSE false END AS can_edit, COALESCE(a.status, 'active') AS status, CAST(NULL AS TEXT) AS approval_status, CAST(NULL AS TEXT) AS approved_by_email, CAST(NULL AS TIMESTAMP WITHOUT TIME ZONE) AS approved_at, CAST(NULL AS TEXT) AS rejected_by_email, CAST(NULL AS TIMESTAMP WITHOUT TIME ZONE) AS rejected_at, CAST(NULL AS TEXT) AS reviewed_by_email, CAST(NULL AS TEXT) AS review_message, false AS can_review, a.created_at, a.updated_at, CAST(NULL AS TEXT) AS color FROM datastore:substage_annotations_v4 a JOIN pad_wells w ON w.name = a.name WHERE COALESCE(a.status, 'active') = 'active' AND (a.layer_id = 'manual:shared' OR a.layer_id = 'manual:user:' || md5(CAST(:current_user_email AS TEXT)) OR EXISTS (SELECT 1 FROM datastore:substage_label_layers_v3 l WHERE l.layer_id = a.layer_id AND COALESCE(l.status, 'active') = 'active' AND (l.owner_email = CAST(:current_user_email AS TEXT) OR l.created_by_email = CAST(:current_user_email AS TEXT)))) AND CAST(a.start_time AS timestamp) <= (CAST(:end_time AS timestamp) + (COALESCE(CAST(:context_minutes AS INTEGER), 0) || ' minutes')::interval) AND CAST(a.end_time AS timestamp) >= (CAST(:start_time AS timestamp) - (COALESCE(CAST(:context_minutes AS INTEGER), 0) || ' minutes')::interval)), unioned AS (SELECT * FROM user_annotations), bounds AS ( SELECT CAST(:start_time AS TIMESTAMP) - (CAST(:context_minutes AS INTEGER) || ' minutes')::interval AS win_start, CAST(:end_time AS TIMESTAMP) + (CAST(:context_minutes AS INTEGER) || ' minutes')::interval AS win_end ), base AS ( SELECT a.annotation_id, a.layer_id, a.name AS well_name, CAST(COALESCE(a.timestamp, a.start_time) AS TIMESTAMP) AS ts, LOWER(REPLACE(REPLACE(COALESCE(a.substage_name, ''), ' ', '_'), '-', '_')) AS nm, CASE WHEN LOWER(REPLACE(REPLACE(COALESCE(a.substage_name, ''), ' ', '_'), '-', '_')) IN ('open_well','stage_start') THEN 'open' ELSE 'close' END AS role, CASE WHEN LOWER(REPLACE(REPLACE(COALESCE(a.substage_name, ''), ' ', '_'), '-', '_')) IN ('open_well','close_well') THEN 'well' ELSE 'stage' END AS bt FROM datastore:substage_annotations_v4 a JOIN pad_wells w ON w.name = a.name CROSS JOIN bounds b WHERE COALESCE(a.status, 'active') = 'active' AND COALESCE(a.source_type, 'user') <> 'model' AND a.layer_id = :layer_id AND CAST(COALESCE(a.timestamp, a.start_time) AS TIMESTAMP) BETWEEN b.win_start AND b.win_end AND LOWER(REPLACE(REPLACE(COALESCE(a.substage_name, ''), ' ', '_'), '-', '_')) IN ('open_well','close_well','stage_start','stage_end') ), well_mk AS (SELECT * FROM base WHERE bt='well'), stage_mk AS (SELECT * FROM base WHERE bt='stage'), well_seq AS (SELECT well_mk.*, SUM(CASE WHEN role='open' THEN 1 ELSE -1 END) OVER (PARTITION BY layer_id, well_name ORDER BY ts, annotation_id) AS rb FROM well_mk), well_eff AS (SELECT well_seq.*, rb - LEAST(0, MIN(rb) OVER (PARTITION BY layer_id, well_name ORDER BY ts, annotation_id ROWS UNBOUNDED PRECEDING)) AS es FROM well_seq), well_eb AS (SELECT well_eff.*, COALESCE(LAG(es) OVER (PARTITION BY layer_id, well_name ORDER BY ts, annotation_id), 0) AS eb FROM well_eff), well_lv AS (SELECT well_eb.*, CASE WHEN role='open' THEN es END AS el, CASE WHEN role='close' AND es < eb THEN eb END AS rl FROM well_eb), well_op AS (SELECT well_lv.*, ROW_NUMBER() OVER (PARTITION BY layer_id, well_name, el ORDER BY ts, annotation_id) AS rn FROM well_lv WHERE role='open'), well_cl AS (SELECT well_lv.*, ROW_NUMBER() OVER (PARTITION BY layer_id, well_name, rl ORDER BY ts, annotation_id) AS rn FROM well_lv WHERE role='close' AND rl IS NOT NULL), well_pairs AS (SELECT o.layer_id, o.well_name, o.annotation_id AS sid, c.annotation_id AS eid, o.ts AS gs, c.ts AS ge FROM well_op o JOIN well_cl c ON c.layer_id=o.layer_id AND c.well_name=o.well_name AND c.rl=o.el AND c.rn=o.rn WHERE c.ts>o.ts), stage_seq AS (SELECT stage_mk.*, SUM(CASE WHEN role='open' THEN 1 ELSE -1 END) OVER (PARTITION BY layer_id, well_name ORDER BY ts, annotation_id) AS rb FROM stage_mk), stage_eff AS (SELECT stage_seq.*, rb - LEAST(0, MIN(rb) OVER (PARTITION BY layer_id, well_name ORDER BY ts, annotation_id ROWS UNBOUNDED PRECEDING)) AS es FROM stage_seq), stage_eb AS (SELECT stage_eff.*, COALESCE(LAG(es) OVER (PARTITION BY layer_id, well_name ORDER BY ts, annotation_id), 0) AS eb FROM stage_eff), stage_lv AS (SELECT stage_eb.*, CASE WHEN role='open' THEN es END AS el, CASE WHEN role='close' AND es < eb THEN eb END AS rl FROM stage_eb), stage_op AS (SELECT stage_lv.*, ROW_NUMBER() OVER (PARTITION BY layer_id, well_name, el ORDER BY ts, annotation_id) AS rn FROM stage_lv WHERE role='open'), stage_cl AS (SELECT stage_lv.*, ROW_NUMBER() OVER (PARTITION BY layer_id, well_name, rl ORDER BY ts, annotation_id) AS rn FROM stage_lv WHERE role='close' AND rl IS NOT NULL), stage_pairs AS (SELECT o.layer_id, o.well_name, o.annotation_id AS sid, c.annotation_id AS eid, o.ts AS gs, c.ts AS ge FROM stage_op o JOIN stage_cl c ON c.layer_id=o.layer_id AND c.well_name=o.well_name AND c.rl=o.el AND c.rn=o.rn WHERE c.ts>o.ts), same_pairs AS (SELECT * FROM well_pairs UNION ALL SELECT * FROM stage_pairs), matched_ids AS (SELECT sid AS id FROM same_pairs UNION SELECT eid FROM same_pairs), cross_mk AS (SELECT * FROM base WHERE annotation_id NOT IN (SELECT id FROM matched_ids)), cross_seq AS (SELECT cross_mk.*, SUM(CASE WHEN role='open' THEN 1 ELSE -1 END) OVER (PARTITION BY layer_id, well_name ORDER BY ts, annotation_id) AS rb FROM cross_mk), cross_eff AS (SELECT cross_seq.*, rb - LEAST(0, MIN(rb) OVER (PARTITION BY layer_id, well_name ORDER BY ts, annotation_id ROWS UNBOUNDED PRECEDING)) AS es FROM cross_seq), cross_eb AS (SELECT cross_eff.*, COALESCE(LAG(es) OVER (PARTITION BY layer_id, well_name ORDER BY ts, annotation_id), 0) AS eb FROM cross_eff), cross_lv AS (SELECT cross_eb.*, CASE WHEN role='open' THEN es END AS el, CASE WHEN role='close' AND es < eb THEN eb END AS rl FROM cross_eb), cross_op AS (SELECT cross_lv.*, ROW_NUMBER() OVER (PARTITION BY layer_id, well_name, el ORDER BY ts, annotation_id) AS rn FROM cross_lv WHERE role='open'), cross_cl AS (SELECT cross_lv.*, ROW_NUMBER() OVER (PARTITION BY layer_id, well_name, rl ORDER BY ts, annotation_id) AS rn FROM cross_lv WHERE role='close' AND rl IS NOT NULL), cross_pairs AS (SELECT o.layer_id, o.well_name, o.annotation_id AS sid, c.annotation_id AS eid, o.ts AS gs, c.ts AS ge FROM cross_op o JOIN cross_cl c ON c.layer_id=o.layer_id AND c.well_name=o.well_name AND c.rl=o.el AND c.rn=o.rn WHERE c.ts>o.ts), all_pairs AS (SELECT * FROM same_pairs UNION ALL SELECT * FROM cross_pairs), groups AS (SELECT p.* FROM all_pairs p WHERE NOT EXISTS (SELECT 1 FROM all_pairs q WHERE q.layer_id=p.layer_id AND q.well_name=p.well_name AND q.sid<>p.sid AND q.gs<=p.gs AND q.ge>=p.ge)), grp_groups AS (SELECT layer_id, well_name, gs AS gstart, ge AS gend FROM groups) SELECT * FROM unioned u WHERE u.layer_id = :layer_id AND NOT EXISTS ( SELECT 1 FROM grp_groups g WHERE g.layer_id = u.layer_id AND g.well_name = u.well_name AND CAST(u.timestamp AS TIMESTAMP) >= g.gstart AND CAST(u.timestamp AS TIMESTAMP) <= g.gend ) ORDER BY u.well_name ASC, u.start_time ASC, u.end_time ASC, u.created_at ASC ) q",
+  "valueSchema": {
+    "type": "object",
+    "properties": {
+      "annotation_id": {
+        "type": "string"
+      },
+      "well_name": {
+        "type": "string"
+      },
+      "stage_num": {
+        "type": "number"
+      },
+      "substage_name": {
+        "type": "string"
+      },
+      "start_time": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "end_time": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "timestamp": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "start_feature": {
+        "type": "string"
+      },
+      "end_feature": {
+        "type": "string"
+      },
+      "selected_feature": {
+        "type": "string"
+      },
+      "annotation_type": {
+        "type": "string"
+      },
+      "labeler_id": {
+        "type": "string"
+      },
+      "notes": {
+        "type": "string"
+      },
+      "source_type": {
+        "type": "string"
+      },
+      "created_by_email": {
+        "type": "string"
+      },
+      "updated_by_email": {
+        "type": "string"
+      },
+      "can_edit": {
+        "type": "boolean"
+      },
+      "status": {
+        "type": "string"
+      },
+      "created_at": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "updated_at": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "layer_id": {
+        "type": "string"
+      },
+      "rule_concept_id": {
+        "type": "string"
+      },
+      "color": {
+        "type": "string"
+      }
+    },
+    "required": []
+  },
+  "paramsSchema": {
+    "type": "object",
+    "properties": {
+      "fleet_name": {
+        "type": "string"
+      },
+      "pad_name": {
+        "type": "string"
+      },
+      "start_time": {
+        "type": "string"
+      },
+      "end_time": {
+        "type": "string"
+      },
+      "annotation_refresh_nonce": {
+        "type": "string"
+      },
+      "current_user_email": {
+        "type": "string"
+      },
+      "labeler_id": {
+        "type": "string"
+      },
+      "layer_id": {
+        "type": "string"
+      },
+      "context_minutes": {
+        "type": "number",
+        "default": 0
+      }
+    },
+    "required": [
+      "fleet_name",
+      "pad_name",
+      "layer_id",
+      "start_time",
+      "end_time",
+      "current_user_email",
+      "labeler_id"
+    ]
+  }
+}

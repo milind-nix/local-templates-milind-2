@@ -1,0 +1,165 @@
+{
+  "key": "nextier_auto_labeling_remaining_fleets_v1",
+  "displayName": "Nextier Auto Labeling - Remaining Fleets V1",
+  "description": "Scheduled Auto substage labeling for fleets outside Frac 76 and Frac 08 over copper continuous stage windows.",
+  "runtime": "prefect",
+  "flow": {
+    "entrypoint": "scripts/workflows/nextier_auto_labeling_v1/main.py:nextier_auto_labeling_v1_flow",
+    "include": [
+      "scripts/workflows/nextier_auto_labeling_v1/**/*.py",
+      "scripts/workflows/nextier_labeling_common_v1/**/*.py"
+    ],
+    "tags": [
+      "nextier",
+      "labeling",
+      "auto",
+      "substage",
+      "remaining-fleets"
+    ]
+  },
+  "deployment": {
+    "workPool": "default",
+    "timezone": "UTC",
+    "concurrencyLimit": 1,
+    "parameters": {
+      "mode": "historical",
+      "copper_featurestore_key": "nextier_copper_labels_v1",
+      "stage_index_featurestore_key": "nextier_copper_stage_index_v1",
+      "auto_labels_featurestore_key": "nextier_auto_labels_v1",
+      "auto_summary_featurestore_key": "nextier_auto_stage_summary_v1",
+      "auto_manifest_featurestore_key": "nextier_auto_processing_manifest_v1",
+      "lookback_hours": 24,
+      "max_wells": 2,
+      "max_stages": 10,
+      "skip_completed": true,
+      "delete_existing": false,
+      "dry_run": false,
+      "algorithm_version": "nextier_auto_layer_v1",
+      "concentration_feature": "all",
+      "exclude_fleet_names": [
+        "Frac 76",
+        "Frac 08",
+        "Frac 96"
+      ]
+    },
+    "cron": "*/7 * * * *",
+    "concurrencyCollisionStrategy": "CANCEL_NEW"
+  },
+  "paramsSchema": {
+    "type": "object",
+    "properties": {
+      "mode": {
+        "type": "string",
+        "enum": [
+          "live",
+          "background",
+          "historical",
+          "debug"
+        ],
+        "default": "historical"
+      },
+      "copper_featurestore_key": {
+        "type": "string",
+        "default": "nextier_copper_labels_v1"
+      },
+      "stage_index_featurestore_key": {
+        "type": "string",
+        "default": "nextier_copper_stage_index_v1"
+      },
+      "auto_labels_featurestore_key": {
+        "type": "string",
+        "default": "nextier_auto_labels_v1"
+      },
+      "auto_summary_featurestore_key": {
+        "type": "string",
+        "default": "nextier_auto_stage_summary_v1"
+      },
+      "auto_manifest_featurestore_key": {
+        "type": "string",
+        "default": "nextier_auto_processing_manifest_v1"
+      },
+      "well_name": {
+        "type": "string"
+      },
+      "fleet_name": {
+        "type": "string"
+      },
+      "include_fleet_names": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Optional fleet names to include. Use this to partition Auto labeling runs by fleet."
+      },
+      "exclude_fleet_names": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Optional fleet names to exclude. Cannot be used with include_fleet_names."
+      },
+      "pad_name": {
+        "type": "string"
+      },
+      "stage_num": {
+        "type": "number"
+      },
+      "start_time": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "end_time": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "lookback_hours": {
+        "type": "number",
+        "minimum": 0,
+        "default": 24
+      },
+      "max_wells": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 500,
+        "default": 2
+      },
+      "max_stages": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 1000,
+        "default": 10
+      },
+      "skip_completed": {
+        "type": "boolean",
+        "default": true
+      },
+      "delete_existing": {
+        "type": "boolean",
+        "default": false
+      },
+      "dry_run": {
+        "type": "boolean",
+        "default": false
+      },
+      "algorithm_version": {
+        "type": "string",
+        "default": "nextier_auto_layer_v1"
+      },
+      "concentration_feature": {
+        "type": "string",
+        "enum": [
+          "all",
+          "denso",
+          "inline",
+          "target",
+          "auger",
+          "auto"
+        ],
+        "default": "all",
+        "description": "Concentration channels used by the Auto labeler. all processes denso, inline, target, and auger in one run; auto lets the DS resolver choose one best channel."
+      }
+    },
+    "required": []
+  },
+  "initialState": {}
+}

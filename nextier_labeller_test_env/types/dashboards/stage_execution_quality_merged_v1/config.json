@@ -3,6 +3,7 @@
   "displayName": "Stage Execution Quality Score",
   "description": "DS-canonical telemetry-only stage execution scoring and Platinum stage review.",
   "order": 33,
+  "group": "Stage",
   "config": {
     "updateInterval": "5m",
     "specVersion": "v2"

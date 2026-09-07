@@ -1,0 +1,474 @@
+{
+  "key": "manual_stage_groups_overview_v1",
+  "displayName": "Manual Stage Groups Overview.",
+  "description": "Global table of all manual stage groups created in the Substage Labeller, across every fleet, pad and well \u2014 with start/end time, marker count, creator and review status. ",
+  "order": 10,
+  "group": "Substage",
+  "config": {
+    "updateInterval": "5m",
+    "specVersion": "v2"
+  },
+  "paramsSchema": {
+    "type": "object",
+    "properties": {
+      "mine_only": {
+        "type": "string"
+      },
+      "current_user_email": {
+        "type": "string"
+      },
+      "fleet_name": {
+        "type": "string"
+      },
+      "pad_name": {
+        "type": "string"
+      },
+      "well_name": {
+        "type": "string"
+      },
+      "layer_id": {
+        "type": "string"
+      },
+      "approval_status_filter": {
+        "type": "string"
+      },
+      "annotation_refresh_nonce": {
+        "type": "string"
+      }
+    },
+    "required": []
+  },
+  "filters": [],
+  "charts": [],
+  "spec": {
+    "specVersion": "v2",
+    "theme": {
+      "preset": "corporate"
+    },
+    "state": {
+      "params": {
+        "current_user_email": {
+          "type": "string",
+          "default": "{{session.user.email}}"
+        },
+        "fleet_name": {
+          "type": "string",
+          "default": "__ALL__"
+        },
+        "pad_name": {
+          "type": "string",
+          "default": "__ALL__"
+        },
+        "well_name": {
+          "type": "string",
+          "default": "__ALL__"
+        },
+        "layer_id": {
+          "type": "string",
+          "default": "__ALL__"
+        },
+        "approval_status_filter": {
+          "type": "string",
+          "default": "pending"
+        },
+        "annotation_refresh_nonce": {
+          "type": "string",
+          "default": "init"
+        },
+        "created_by_filter": {
+          "type": "string",
+          "default": "raj@neuralix.ai"
+        }
+      }
+    },
+    "navigation": {
+      "initialView": "main"
+    },
+    "widgets": [
+      {
+        "id": "group_filters",
+        "title": "Filters",
+        "chrome": {
+          "disableCard": false,
+          "showActions": false,
+          "hideTitle": true,
+          "padding": 8
+        },
+        "renderConfig": {
+          "library": "Custom",
+          "options": {
+            "type": "form",
+            "config": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "created_by_filter": {
+                    "type": "string",
+                    "default": "raj@neuralix.ai",
+                    "metadata": {
+                      "ui": {
+                        "label": "Show",
+                        "component": "select",
+                        "options": [
+                          {
+                            "label": "Neuralix groups",
+                            "value": "raj@neuralix.ai"
+                          },
+                          {
+                            "label": "All",
+                            "value": "__ALL__"
+                          }
+                        ],
+                        "onChangeEventId": "created_by_changed",
+                        "labelPlacement": "outside-left",
+                        "size": "sm"
+                      }
+                    }
+                  },
+                  "approval_status_filter": {
+                    "type": "string",
+                    "default": "pending",
+                    "metadata": {
+                      "ui": {
+                        "label": "Status",
+                        "component": "select",
+                        "options": [
+                          {
+                            "label": "All",
+                            "value": "__ALL__"
+                          },
+                          {
+                            "label": "Pending",
+                            "value": "pending"
+                          },
+                          {
+                            "label": "Approved",
+                            "value": "approved"
+                          }
+                        ],
+                        "onChangeEventId": "status_changed",
+                        "labelPlacement": "outside-left",
+                        "size": "sm"
+                      }
+                    }
+                  }
+                },
+                "required": [
+                  "approval_status_filter",
+                  "created_by_filter"
+                ],
+                "additionalProperties": false
+              },
+              "formData": {
+                "approval_status_filter": "{{state.approval_status_filter}}",
+                "created_by_filter": "{{state.created_by_filter}}"
+              },
+              "layout": {
+                "cols": 12,
+                "gap": 10,
+                "rows": [
+                  {
+                    "items": [
+                      {
+                        "type": "field",
+                        "key": "created_by_filter",
+                        "colSpan": 3
+                      },
+                      {
+                        "type": "field",
+                        "key": "approval_status_filter",
+                        "colSpan": 3
+                      }
+                    ]
+                  }
+                ]
+              },
+              "actions": []
+            },
+            "ui": {
+              "fieldRadius": "sm",
+              "fieldVariant": "bordered",
+              "fieldSize": "sm"
+            }
+          }
+        },
+        "events": {
+          "status_changed": [
+            {
+              "type": "set_state",
+              "updates": {
+                "approval_status_filter": "{{form.approval_status_filter}}"
+              }
+            }
+          ],
+          "created_by_changed": [
+            {
+              "type": "set_state",
+              "updates": {
+                "created_by_filter": "{{form.created_by_filter}}"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "groups_table",
+        "title": "Manual Stage Groups",
+        "description": "All derived manual stage groups across every fleet, pad and well.",
+        "isDataLarge": false,
+        "chrome": {
+          "disableCard": false,
+          "showActions": false,
+          "padding": {
+            "top": 8,
+            "right": 8,
+            "bottom": 8,
+            "left": 8
+          }
+        },
+        "dataConfig": {
+          "groups_rows": {
+            "source": "metric",
+            "metricKey": "manual_stage_groups_overview_v1",
+            "fieldName": "*",
+            "bindings": {
+              "query": {
+                "current_user_email": "session.user.email",
+                "fleet_name": "fleet_name",
+                "pad_name": "pad_name",
+                "well_name": "well_name",
+                "layer_id": "layer_id",
+                "approval_status_filter": "approval_status_filter",
+                "annotation_refresh_nonce": "annotation_refresh_nonce",
+                "created_by_filter": "created_by_filter"
+              },
+              "required": [
+                "created_by_filter",
+                "approval_status_filter"
+              ]
+            }
+          }
+        },
+        "renderConfig": {
+          "library": "Custom",
+          "options": {
+            "type": "table",
+            "config": {
+              "columns": [
+                {
+                  "key": "fleet_name",
+                  "label": "Fleet",
+                  "minWidth": 110,
+                  "truncate": true
+                },
+                {
+                  "key": "pad_name",
+                  "label": "Pad",
+                  "minWidth": 150,
+                  "truncate": true
+                },
+                {
+                  "key": "well_name",
+                  "label": "Well",
+                  "minWidth": 210,
+                  "truncate": true,
+                  "className": "font-semibold"
+                },
+                {
+                  "key": "start_marker",
+                  "label": "Start",
+                  "minWidth": 120,
+                  "cellType": "pill",
+                  "valueMappings": [
+                    {
+                      "match": "stage_start",
+                      "text": "Stage Start",
+                      "color": "primary"
+                    },
+                    {
+                      "match": "open_well",
+                      "text": "Open Well",
+                      "color": "primary"
+                    }
+                  ]
+                },
+                {
+                  "key": "end_marker",
+                  "label": "End",
+                  "minWidth": 120,
+                  "cellType": "pill",
+                  "valueMappings": [
+                    {
+                      "match": "stage_end",
+                      "text": "Stage End",
+                      "color": "secondary"
+                    },
+                    {
+                      "match": "close_well",
+                      "text": "Close Well",
+                      "color": "secondary"
+                    }
+                  ]
+                },
+                {
+                  "key": "start_time",
+                  "label": "Start Time",
+                  "minWidth": 180,
+                  "truncate": true,
+                  "formatTemplate": "{{ value | dateTime('MMM dd, yyyy HH:mm:ss') }}"
+                },
+                {
+                  "key": "end_time",
+                  "label": "End Time",
+                  "minWidth": 180,
+                  "truncate": true,
+                  "formatTemplate": "{{ value | dateTime('MMM dd, yyyy HH:mm:ss') }}"
+                },
+                {
+                  "key": "child_count",
+                  "label": "Markers",
+                  "minWidth": 90
+                },
+                {
+                  "key": "created_by_email",
+                  "label": "Created By",
+                  "minWidth": 210,
+                  "truncate": true
+                },
+                {
+                  "key": "created_at",
+                  "label": "Created At",
+                  "minWidth": 180,
+                  "truncate": true,
+                  "formatTemplate": "{{ value | dateTime('MMM dd, yyyy HH:mm:ss') }}"
+                },
+                {
+                  "key": "approval_status",
+                  "label": "Status",
+                  "minWidth": 120,
+                  "cellType": "pill",
+                  "valueMappings": [
+                    {
+                      "match": "approved",
+                      "text": "Approved",
+                      "color": "success"
+                    },
+                    {
+                      "match": "pending",
+                      "text": "Pending",
+                      "color": "warning"
+                    }
+                  ]
+                }
+              ],
+              "dataset": {
+                "source": "data:dataset",
+                "dimensions": [
+                  "groups_rows.group_key",
+                  "groups_rows.fleet_name",
+                  "groups_rows.pad_name",
+                  "groups_rows.well_name",
+                  "groups_rows.layer_id",
+                  "groups_rows.stage_num",
+                  "groups_rows.start_marker",
+                  "groups_rows.end_marker",
+                  "groups_rows.start_time",
+                  "groups_rows.end_time",
+                  "groups_rows.child_count",
+                  "groups_rows.created_by_email",
+                  "groups_rows.created_at",
+                  "groups_rows.approval_status",
+                  "groups_rows.review_message",
+                  "groups_rows.reviewed_by_email",
+                  "groups_rows.reviewed_at",
+                  "groups_rows.color"
+                ]
+              },
+              "groupable": true,
+              "pagination": true,
+              "defaultGroupBy": [
+                "fleet_name",
+                "pad_name"
+              ],
+              "emptyText": "No manual stage groups found for this filter.",
+              "rowClickEventId": "open_labeller"
+            },
+            "ui": {
+              "preset": "corporate",
+              "variant": "bordered",
+              "cellHeight": "sm",
+              "fontSize": "sm",
+              "headerFontSize": "sm",
+              "stickyHeader": true,
+              "rowHover": true,
+              "rowDividers": true,
+              "columnDividers": true,
+              "enablePagination": true,
+              "rowsPerPage": 25,
+              "maxBodyHeight": 560
+            }
+          }
+        },
+        "events": {
+          "open_labeller": [
+            {
+              "type": "redirect",
+              "dashboardKey": "substage_labeller_group_review_beta_v1",
+              "paramsMap": {
+                "fleet_name": "fleet_name",
+                "pad_name": "pad_name",
+                "well_name": "well_name",
+                "layer_id": "active_layer_id",
+                "start_time": "start_time",
+                "end_time": "end_time"
+              },
+              "additionalParams": {
+                "data_window": "custom",
+                "three_axis_annotation_chart__zoom__loaded_resolution": "raw",
+                "three_axis_annotation_chart_line__zoom__loaded_resolution": "raw",
+                "context_minutes": 30,
+                "return_to_dashboard": "manual_stage_groups_overview_v1"
+              },
+              "openInNewTab": false
+            }
+          ]
+        }
+      }
+    ],
+    "views": [
+      {
+        "id": "main",
+        "title": "Manual Stage Groups Overview",
+        "presentation": {
+          "type": "page",
+          "gridMargin": [
+            12,
+            8
+          ]
+        },
+        "layout": [
+          {
+            "instanceId": "group_filters_main",
+            "widgetId": "group_filters",
+            "gridPos": {
+              "x": 0,
+              "y": 0,
+              "w": 24,
+              "h": 2
+            }
+          },
+          {
+            "instanceId": "groups_table_main",
+            "widgetId": "groups_table",
+            "gridPos": {
+              "x": 0,
+              "y": 2,
+              "w": 24,
+              "h": 20
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

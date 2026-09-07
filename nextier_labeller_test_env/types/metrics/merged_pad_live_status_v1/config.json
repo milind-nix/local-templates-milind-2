@@ -1,0 +1,55 @@
+{
+  "key": "merged_pad_live_status_v1",
+  "displayName": "Merged Pad Live Status",
+  "description": "Live/inactive status for the selected fleet, pad, and optional well based on latest merged well-index timestamp.",
+  "sql": "SELECT * FROM (WITH scoped AS (SELECT CAST(last_record_ts AS TIMESTAMP) AS last_record_ts FROM featurestore:merged_well_index_v1 WHERE COALESCE(NULLIF(fleet_name, ''), 'Unknown') = :fleet_name AND COALESCE(NULLIF(pad_name, ''), 'Unknown') = :pad_name AND (CAST(:well_name AS TEXT) IN ('', '__ALL__') OR name = CAST(:well_name AS TEXT))), latest AS (SELECT MAX(last_record_ts) AS latest_record_ts FROM scoped) SELECT CASE WHEN latest_record_ts IS NOT NULL AND latest_record_ts >= (NOW() - (CAST(:freshness_minutes AS INTEGER) || ' minutes')::interval) THEN 'Live (24 hrs)' ELSE 'Inactive (24 hrs)' END AS status_label, CASE WHEN latest_record_ts IS NOT NULL AND latest_record_ts >= (NOW() - (CAST(:freshness_minutes AS INTEGER) || ' minutes')::interval) THEN true ELSE false END AS is_live, latest_record_ts, CASE WHEN latest_record_ts IS NULL THEN NULL ELSE ROUND((EXTRACT(EPOCH FROM (NOW() - latest_record_ts)) / 60.0)::numeric, 1) END AS minutes_since_latest FROM latest) q",
+  "valueSchema": {
+    "type": "object",
+    "properties": {
+      "status_label": {
+        "type": "string"
+      },
+      "is_live": {
+        "type": "boolean"
+      },
+      "latest_record_ts": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "minutes_since_latest": {
+        "type": "number"
+      }
+    },
+    "required": []
+  },
+  "paramsSchema": {
+    "type": "object",
+    "properties": {
+      "fleet_name": {
+        "type": "string"
+      },
+      "pad_name": {
+        "type": "string"
+      },
+      "well_name": {
+        "type": "string",
+        "default": "__ALL__"
+      },
+      "freshness_minutes": {
+        "type": "number",
+        "default": 30
+      },
+      "refresh_nonce": {
+        "type": "string",
+        "default": "init"
+      }
+    },
+    "required": [
+      "fleet_name",
+      "pad_name",
+      "well_name",
+      "freshness_minutes",
+      "refresh_nonce"
+    ]
+  }
+}

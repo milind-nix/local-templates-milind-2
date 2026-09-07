@@ -1,0 +1,99 @@
+{
+  "key": "nextier_titanium_stage_index_v1",
+  "displayName": "Nextier Titanium Stage Index V1",
+  "description": "Compact Titanium stage windows. final windows are authoritative; first windows are causal/live.",
+  "sql": "SELECT CAST(NULL AS TEXT) AS stage_uid, fleet_name, pad_name, name AS well_name, id AS well_id, api_num, CAST(NULL AS DOUBLE PRECISION) AS stage_num, CAST(NULL AS TEXT) AS stage_start_ts, CAST(NULL AS TEXT) AS stage_end_ts, CAST(NULL AS TEXT) AS first_start_ts, CAST(NULL AS TEXT) AS first_end_ts, CAST(NULL AS TEXT) AS final_start_ts, CAST(NULL AS TEXT) AS final_end_ts, CAST(NULL AS DOUBLE PRECISION) AS sample_count, CAST(NULL AS DOUBLE PRECISION) AS avg_rate_slurry, CAST(NULL AS DOUBLE PRECISION) AS max_rate_slurry, CAST(NULL AS DOUBLE PRECISION) AS avg_press_mainline, CAST(NULL AS DOUBLE PRECISION) AS max_press_mainline, CAST(NULL AS TEXT) AS stage_status, CAST(NULL AS TEXT) AS source_stage_column, CAST(NULL AS TEXT) AS algorithm_version, CAST(NULL AS TEXT) AS source_mode, CAST(NULL AS TEXT) AS processed_at FROM datastore:merged_fleet_stream_customer_full_v2 WHERE 1 = 0",
+  "checkpoint_fields": [],
+  "upsert": true,
+  "dataSchema": {
+    "type": "object",
+    "properties": {
+      "stage_uid": {
+        "type": "string",
+        "metadata": {
+          "isPrimaryKey": true
+        }
+      },
+      "fleet_name": {
+        "type": "string"
+      },
+      "pad_name": {
+        "type": "string"
+      },
+      "well_name": {
+        "type": "string"
+      },
+      "well_id": {
+        "type": "string"
+      },
+      "api_num": {
+        "type": "string"
+      },
+      "stage_num": {
+        "type": "number"
+      },
+      "stage_start_ts": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "stage_end_ts": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "first_start_ts": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "first_end_ts": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "final_start_ts": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "final_end_ts": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "sample_count": {
+        "type": "number"
+      },
+      "avg_rate_slurry": {
+        "type": "number"
+      },
+      "max_rate_slurry": {
+        "type": "number"
+      },
+      "avg_press_mainline": {
+        "type": "number"
+      },
+      "max_press_mainline": {
+        "type": "number"
+      },
+      "stage_status": {
+        "type": "string"
+      },
+      "source_stage_column": {
+        "type": "string"
+      },
+      "algorithm_version": {
+        "type": "string"
+      },
+      "source_mode": {
+        "type": "string"
+      },
+      "processed_at": {
+        "type": "string",
+        "format": "date-time"
+      }
+    },
+    "required": [
+      "stage_uid",
+      "well_name",
+      "stage_num",
+      "stage_start_ts",
+      "stage_end_ts"
+    ]
+  }
+}

@@ -1,0 +1,99 @@
+{
+  "key": "manual_stage_groups_overview_v1",
+  "displayName": "Manual Stage Groups Overview",
+  "description": "All derived manual stage groups across every fleet/pad/well, with the creator and group-level review state. Supports a My-groups filter via mine_only + current_user_email.",
+  "sql": "SELECT * FROM ( WITH pad_wells AS (   SELECT name, COALESCE(NULLIF(fleet_name, ''), 'Unknown') AS fleet_name, COALESCE(NULLIF(pad_name, ''), 'Unknown') AS pad_name   FROM featurestore:merged_well_index_v1 ), manual_markers AS (   SELECT a.annotation_id, a.layer_id, a.labeler_id, a.name AS well_name,     COALESCE(pw.fleet_name, 'Unknown') AS fleet_name, COALESCE(pw.pad_name, 'Unknown') AS pad_name,     a.stage_num, a.created_by_email, a.created_at,     LOWER(REPLACE(REPLACE(COALESCE(a.substage_name, ''), ' ', '_'), '-', '_')) AS normalized_marker,     CAST(COALESCE(a.timestamp, a.start_time) AS TIMESTAMP) AS marker_ts,     CASE WHEN LOWER(REPLACE(REPLACE(COALESCE(a.substage_name, ''), ' ', '_'), '-', '_')) IN ('stage_start', 'open_well') THEN 'start'          WHEN LOWER(REPLACE(REPLACE(COALESCE(a.substage_name, ''), ' ', '_'), '-', '_')) IN ('stage_end', 'close_well') THEN 'end' ELSE NULL END AS marker_kind,     CASE LOWER(REPLACE(REPLACE(COALESCE(a.substage_name, ''), ' ', '_'), '-', '_')) WHEN 'open_well' THEN 1 WHEN 'stage_start' THEN 2 ELSE 99 END AS start_priority,     CASE LOWER(REPLACE(REPLACE(COALESCE(a.substage_name, ''), ' ', '_'), '-', '_')) WHEN 'close_well' THEN 1 WHEN 'stage_end' THEN 2 ELSE 99 END AS end_priority   FROM datastore:substage_annotations_v4 a   LEFT JOIN pad_wells pw ON pw.name = a.name   WHERE COALESCE(a.status, 'active') = 'active' AND COALESCE(a.source_type, 'user') <> 'model'     AND (CAST(:layer_id AS TEXT) IN ('', '__ALL__') OR a.layer_id = CAST(:layer_id AS TEXT))     AND (CAST(:well_name AS TEXT) IN ('', '__ALL__') OR a.name = CAST(:well_name AS TEXT))     AND (CAST(:fleet_name AS TEXT) IN ('', '__ALL__') OR COALESCE(pw.fleet_name, 'Unknown') = CAST(:fleet_name AS TEXT))     AND (CAST(:pad_name AS TEXT) IN ('', '__ALL__') OR COALESCE(pw.pad_name, 'Unknown') = CAST(:pad_name AS TEXT))     ), boundary_markers AS ( SELECT * FROM manual_markers WHERE marker_kind IN ('start', 'end') ), seg AS ( SELECT bm.*, COALESCE(SUM(CASE WHEN normalized_marker = 'open_well' THEN 1 WHEN normalized_marker = 'close_well' THEN -1 ELSE 0 END) OVER (PARTITION BY layer_id, well_name ORDER BY marker_ts, annotation_id ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING), 0) AS depth_before, LAG(marker_kind) OVER (PARTITION BY layer_id, well_name ORDER BY marker_ts, annotation_id) AS prev_kind FROM boundary_markers bm ), segid AS ( SELECT seg.*, SUM(CASE WHEN marker_kind = 'start' AND prev_kind = 'end' AND depth_before = 0 THEN 1 ELSE 0 END) OVER (PARTITION BY layer_id, well_name ORDER BY marker_ts, annotation_id ROWS UNBOUNDED PRECEDING) AS segment_id FROM seg ), ranked AS ( SELECT segid.*, ROW_NUMBER() OVER (PARTITION BY layer_id, well_name, segment_id, marker_kind ORDER BY (CASE WHEN marker_kind = 'start' THEN start_priority ELSE end_priority END), (CASE WHEN marker_kind = 'start' THEN extract(epoch from marker_ts) ELSE -extract(epoch from marker_ts) END)) AS rn FROM segid ), start_choices AS ( SELECT layer_id, well_name, segment_id, annotation_id AS start_annotation_id, labeler_id, fleet_name, pad_name, created_by_email, created_at, stage_num, normalized_marker AS start_marker, marker_ts AS start_time FROM ranked WHERE marker_kind = 'start' AND rn = 1 ), end_choices AS ( SELECT layer_id, well_name, segment_id, annotation_id AS end_annotation_id, stage_num, normalized_marker AS end_marker, marker_ts AS end_time FROM ranked WHERE marker_kind = 'end' AND rn = 1 ), valid_groups AS (   SELECT 'manual_stage:' || s.layer_id || ':' || s.start_annotation_id || ':' || e.end_annotation_id AS group_key,     s.layer_id, s.labeler_id, s.fleet_name, s.pad_name, s.well_name, s.stage_num,     s.start_annotation_id, e.end_annotation_id, s.start_marker, e.end_marker,     s.created_by_email, s.created_at, s.start_time, e.end_time   FROM start_choices s JOIN end_choices e     ON e.layer_id = s.layer_id AND e.well_name = s.well_name AND e.segment_id = s.segment_id ), child_counts AS (   SELECT g.group_key, COUNT(a.annotation_id) AS child_count   FROM valid_groups g LEFT JOIN datastore:substage_annotations_v4 a     ON a.layer_id = g.layer_id AND a.name = g.well_name    AND COALESCE(a.status, 'active') = 'active' AND COALESCE(a.source_type, 'user') <> 'model'    AND CAST(COALESCE(a.timestamp, a.start_time) AS TIMESTAMP) >= g.start_time    AND CAST(COALESCE(a.timestamp, a.start_time) AS TIMESTAMP) <= g.end_time   GROUP BY g.group_key ) SELECT g.group_key, g.fleet_name, g.pad_name, g.well_name, g.layer_id, g.stage_num,   g.start_marker, g.end_marker, to_char(g.start_time, 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"') AS start_time, to_char(g.end_time, 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"') AS end_time,   CAST(EXTRACT(EPOCH FROM (g.end_time - g.start_time)) AS BIGINT) AS duration_seconds,   COALESCE(c.child_count, 0) AS child_count, g.created_by_email, g.created_at,   COALESCE(r.approval_status, 'pending') AS approval_status, r.review_message, r.reviewed_by_email, r.reviewed_at,   CASE WHEN COALESCE(r.approval_status, 'pending') = 'approved' THEN '#22C55E' ELSE '#F59E0B' END AS color FROM valid_groups g LEFT JOIN child_counts c ON c.group_key = g.group_key LEFT JOIN datastore:substage_manual_stage_reviews_v1 r ON r.group_key = g.group_key AND COALESCE(r.status, 'active') = 'active' WHERE (CAST(:approval_status_filter AS TEXT) IN ('', '__ALL__') OR COALESCE(r.approval_status, 'pending') = CAST(:approval_status_filter AS TEXT)) AND (g.layer_id NOT LIKE 'manual:user:%' OR g.layer_id = 'manual:user:' || md5(CAST(:current_user_email AS TEXT))) AND (CAST(:created_by_filter AS TEXT) IN ('', '__ALL__') OR g.created_by_email = CAST(:created_by_filter AS TEXT)) ORDER BY g.created_at DESC NULLS LAST, g.fleet_name, g.pad_name, g.well_name, g.start_time ) q",
+  "valueSchema": {
+    "type": "object",
+    "properties": {
+      "group_key": {
+        "type": "string"
+      },
+      "fleet_name": {
+        "type": "string"
+      },
+      "pad_name": {
+        "type": "string"
+      },
+      "well_name": {
+        "type": "string"
+      },
+      "layer_id": {
+        "type": "string"
+      },
+      "stage_num": {
+        "type": "number"
+      },
+      "start_marker": {
+        "type": "string"
+      },
+      "end_marker": {
+        "type": "string"
+      },
+      "start_time": {
+        "type": "string"
+      },
+      "end_time": {
+        "type": "string"
+      },
+      "duration_seconds": {
+        "type": "number"
+      },
+      "child_count": {
+        "type": "number"
+      },
+      "created_by_email": {
+        "type": "string"
+      },
+      "created_at": {
+        "type": "string"
+      },
+      "approval_status": {
+        "type": "string"
+      },
+      "review_message": {
+        "type": "string"
+      },
+      "reviewed_by_email": {
+        "type": "string"
+      },
+      "reviewed_at": {
+        "type": "string"
+      },
+      "color": {
+        "type": "string"
+      }
+    },
+    "required": []
+  },
+  "paramsSchema": {
+    "type": "object",
+    "properties": {
+      "current_user_email": {
+        "type": "string"
+      },
+      "fleet_name": {
+        "type": "string"
+      },
+      "pad_name": {
+        "type": "string"
+      },
+      "well_name": {
+        "type": "string"
+      },
+      "layer_id": {
+        "type": "string"
+      },
+      "approval_status_filter": {
+        "type": "string"
+      },
+      "annotation_refresh_nonce": {
+        "type": "string"
+      },
+      "created_by_filter": {
+        "type": "string"
+      }
+    },
+    "required": []
+  }
+}

@@ -24,7 +24,8 @@
       "bucket_seconds": 60,
       "chunk_hours": 24,
       "max_chunks": 1
-    }
+    },
+    "concurrencyCollisionStrategy": "CANCEL_NEW"
   },
   "paramsSchema": {
     "type": "object",

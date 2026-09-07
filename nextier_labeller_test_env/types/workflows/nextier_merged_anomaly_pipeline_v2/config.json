@@ -28,7 +28,8 @@
       "rolling_points": 1,
       "max_gap_seconds": 120,
       "dry_run": false
-    }
+    },
+    "concurrencyCollisionStrategy": "CANCEL_NEW"
   },
   "paramsSchema": {
     "type": "object",

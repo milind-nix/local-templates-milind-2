@@ -1,0 +1,122 @@
+{
+  "key": "nextier_labeling_processing_manifest_v1",
+  "displayName": "Nextier Labeling Processing Manifest V1",
+  "description": "Durable run and lineage manifest for bronze/copper labeling windows. Prefect state tracks execution; this table tracks data processing decisions.",
+  "sql": "SELECT CAST(NULL AS TEXT) AS manifest_id, CAST(NULL AS TEXT) AS run_id, CAST(NULL AS TEXT) AS workflow_name, CAST(NULL AS TEXT) AS mode, CAST(NULL AS TEXT) AS fleet_name, CAST(NULL AS TEXT) AS pad_name, CAST(NULL AS TEXT) AS well_name, CAST(NULL AS TEXT) AS requested_start_ts, CAST(NULL AS TEXT) AS requested_end_ts, CAST(NULL AS TEXT) AS effective_start_ts, CAST(NULL AS TEXT) AS effective_end_ts, CAST(NULL AS DOUBLE PRECISION) AS lookback_hours, CAST(NULL AS DOUBLE PRECISION) AS chunk_hours, CAST(NULL AS DOUBLE PRECISION) AS chunk_index, CAST(NULL AS TEXT) AS source_datastore_key, CAST(NULL AS DOUBLE PRECISION) AS source_row_count, CAST(NULL AS TEXT) AS source_min_record_ts, CAST(NULL AS TEXT) AS source_max_record_ts, CAST(NULL AS TEXT) AS bronze_status, CAST(NULL AS TEXT) AS copper_status, CAST(NULL AS TEXT) AS stage_index_status, CAST(NULL AS DOUBLE PRECISION) AS rows_bronze_written, CAST(NULL AS DOUBLE PRECISION) AS rows_copper_written, CAST(NULL AS DOUBLE PRECISION) AS stage_count_written, CAST(NULL AS TEXT) AS algorithm_version, CAST(NULL AS BOOLEAN) AS dry_run, CAST(NULL AS TEXT) AS status, CAST(NULL AS TEXT) AS error_message, CAST(NULL AS TEXT) AS started_at, CAST(NULL AS TEXT) AS completed_at FROM datastore:merged_fleet_stream_customer_full_v2 WHERE 1 = 0",
+  "checkpoint_fields": [],
+  "upsert": true,
+  "dataSchema": {
+    "type": "object",
+    "properties": {
+      "manifest_id": {
+        "type": "string",
+        "metadata": {
+          "isPrimaryKey": true
+        }
+      },
+      "run_id": {
+        "type": "string"
+      },
+      "workflow_name": {
+        "type": "string"
+      },
+      "mode": {
+        "type": "string"
+      },
+      "fleet_name": {
+        "type": "string"
+      },
+      "pad_name": {
+        "type": "string"
+      },
+      "well_name": {
+        "type": "string"
+      },
+      "requested_start_ts": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "requested_end_ts": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "effective_start_ts": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "effective_end_ts": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "lookback_hours": {
+        "type": "number"
+      },
+      "chunk_hours": {
+        "type": "number"
+      },
+      "chunk_index": {
+        "type": "number"
+      },
+      "source_datastore_key": {
+        "type": "string"
+      },
+      "source_row_count": {
+        "type": "number"
+      },
+      "source_min_record_ts": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "source_max_record_ts": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "bronze_status": {
+        "type": "string"
+      },
+      "copper_status": {
+        "type": "string"
+      },
+      "stage_index_status": {
+        "type": "string"
+      },
+      "rows_bronze_written": {
+        "type": "number"
+      },
+      "rows_copper_written": {
+        "type": "number"
+      },
+      "stage_count_written": {
+        "type": "number"
+      },
+      "algorithm_version": {
+        "type": "string"
+      },
+      "dry_run": {
+        "type": "boolean"
+      },
+      "status": {
+        "type": "string"
+      },
+      "error_message": {
+        "type": "string"
+      },
+      "started_at": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "completed_at": {
+        "type": "string",
+        "format": "date-time"
+      }
+    },
+    "required": [
+      "manifest_id",
+      "workflow_name",
+      "mode",
+      "well_name",
+      "status",
+      "started_at"
+    ]
+  }
+}
