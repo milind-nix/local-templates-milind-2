@@ -177,24 +177,64 @@ def _build_stage_index(
 ) -> pd.DataFrame:
     if labels.empty:
         return pd.DataFrame()
-    frame = labels.copy().sort_values(["record_ts", "created_ts", "telemetry_point_id"], na_position="last")
-    frame["_stage"] = frame.apply(_stage_value, axis=1).astype(float)
-    frame["_status"] = np.where(frame["titanium_final"].fillna(0).astype(float) > 0, "final", "first")
-    frame = frame[frame["_stage"] > 0].copy()
-    if frame.empty:
-        return pd.DataFrame()
+    ordered = labels.copy().sort_values(["record_ts", "created_ts", "telemetry_point_id"], na_position="last")
 
-    # Split on stage/status changes and large telemetry gaps. This keeps the
-    # compact index faithful to exactly what Titanium labeled in row data.
-    ts = pd.to_datetime(frame["record_ts"], errors="coerce")
-    change = (frame["_stage"] != frame["_stage"].shift()) | (frame["_status"] != frame["_status"].shift())
-    change |= ts.diff().dt.total_seconds().fillna(0) > 300
-    frame["_segment"] = change.cumsum()
+    # BOTH tiers get their own windows.
+    #
+    # This used to derive one status per row -- "final" when titanium_final > 0,
+    # else "first" -- and segment once. But the two tiers overlap almost
+    # everywhere: on AUSTIN 474-1004H all 201,963 labeled rows carry BOTH a
+    # first and a final ordinal, and not one row is first-only. So every row
+    # classified as "final", the index held 38 final windows and ZERO first
+    # ones, and the FIRST tier -- which the reference dashboard reports as 39
+    # stages, from 37 merged + 2 splits with 1 later withdrawn -- could not be
+    # reconstructed from the featurestore at all. `first_start_ts` was NULL on
+    # every row, so sapphire's `stage_source=first` path had nothing to read
+    # either.
+    #
+    # The row data was never wrong: titanium_first reaches ordinal 39 and
+    # titanium_final reaches 38, exactly as the algorithm reports. It was the
+    # index that collapsed them. Segment once per tier and emit both, so the
+    # index carries 39 first windows AND 38 final windows.
+    #
+    # `stage_uid` already includes the status, so the two sets cannot collide.
+    rows: list[dict[str, Any]] = []
+    for status, source_col in (("first", "titanium_first"), ("final", "titanium_final")):
+        if source_col not in ordered.columns:
+            continue
+        frame = ordered.copy()
+        frame["_stage"] = pd.to_numeric(frame[source_col], errors="coerce").fillna(0).astype(float)
+        frame = frame[frame["_stage"] > 0].copy()
+        if frame.empty:
+            continue
 
+        # Split on stage changes and large telemetry gaps. This keeps the
+        # compact index faithful to exactly what Titanium labeled in row data.
+        ts = pd.to_datetime(frame["record_ts"], errors="coerce")
+        change = frame["_stage"] != frame["_stage"].shift()
+        change |= ts.diff().dt.total_seconds().fillna(0) > 300
+        frame["_segment"] = change.cumsum()
+
+        rows.extend(_stage_index_rows(
+            frame, status, algorithm_version, mode,
+            stage_mass_by_ordinal, stage_offset, merge_note,
+        ))
+    return pd.DataFrame(rows)
+
+
+def _stage_index_rows(
+    frame: pd.DataFrame,
+    status: str,
+    algorithm_version: str,
+    mode: str,
+    stage_mass_by_ordinal: dict[int, float] | None,
+    stage_offset: int,
+    merge_note: str | None,
+) -> list[dict[str, Any]]:
+    """One index row per contiguous segment of `frame`, for a single tier."""
     rows: list[dict[str, Any]] = []
     for _, group in frame.groupby("_segment", sort=True):
         stage_num = float(group["_stage"].iloc[0])
-        status = str(group["_status"].iloc[0])
         start_ts = group["record_ts"].min()
         end_ts = group["record_ts"].max()
         base = {
@@ -248,7 +288,7 @@ def _build_stage_index(
             "processed_at": now_utc(),
         }
         rows.append(base)
-    return pd.DataFrame(rows)
+    return rows
 
 
 async def _delete_outputs(
