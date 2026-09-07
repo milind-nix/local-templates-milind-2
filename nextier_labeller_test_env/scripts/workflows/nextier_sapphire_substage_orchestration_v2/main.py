@@ -623,8 +623,19 @@ async def _process_well(
 
     if not stage_masses:
         try:
+            # titanium_merge has no conc_cols parameter -- it resolves its channel
+            # with `first_finite_conc_col` and the default order. Narrowing the
+            # frame it sees is the only way to make this fallback agree with the
+            # channel the placements above are computed on; otherwise mass could
+            # come off auger while the landmarks came off target.
+            mass_frame = compute
+            if conc_col:
+                mass_frame = compute.drop(columns=[
+                    c for c in CONC_COLUMNS.values()
+                    if c != conc_col and c in compute.columns
+                ])
             merged = titanium_merge(
-                well_name, df=compute,
+                well_name, df=mass_frame,
                 rate_col="rate_slurry", pressure_col="press_mainline",
                 spans=stage_windows,
             )
@@ -656,6 +667,21 @@ async def _process_well(
     # run_well rather than nextier_core.sapphire_layer.run_sapphire_layer: the core
     # entry point has no stage_masses parameter and cannot forward one. This is the
     # same driver the handoff doc's own titanium_substage example calls.
+    # `conc_cols` is what makes `concentration_feature` mean anything here.
+    #
+    # Without it run_well falls back to CONC_COL_ORDER (auger -> target ->
+    # inline -> denso) and picks the first channel with any finite value, so
+    # the requested channel was ignored on every well that had auger data. The
+    # parameter was recorded on the output rows all the same -- the stage
+    # summary claimed `conc_col=prop_conc_target` while the landmarks had been
+    # placed off auger -- which is worse than not offering the choice.
+    #
+    # A one-tuple is the intended use: every consumer threads it into
+    # `first_finite_conc_col(df, order=conc_cols)`. Passed only when the
+    # channel was found to carry data (checked above); when it is empty
+    # `conc_col` is None and the default order plus the bronze fallback in
+    # `pad_channel` is the better behaviour than pinning to a dead column.
+    conc_kwargs = {"conc_cols": (conc_col,)} if conc_col else {}
     placements = run_sapphire_well(
         well_name,
         df=compute,
@@ -664,6 +690,7 @@ async def _process_well(
         stages=stage_windows,
         stage_masses=stage_masses or None,
         stage_source=stage_source,
+        **conc_kwargs,
     )
     labels = placements_to_labels_df(well_name, compute, _label_spans(placements))
 
