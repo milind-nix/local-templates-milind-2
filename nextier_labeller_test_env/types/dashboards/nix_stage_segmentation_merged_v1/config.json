@@ -596,7 +596,7 @@
       },
       {
         "id": "td_segmentation_chart",
-        "title": "Stage Segmentation — Model Stages (top) vs Ground Truth (bottom)",
+        "title": "Stage Segmentation \u2014 Model Stages (top) vs Ground Truth (bottom)",
         "description": "Merged stage segmentation windows over whole-well telemetry.",
         "isDataLarge": true,
         "chrome": {
@@ -1354,7 +1354,7 @@
                         "overflow": "truncate"
                       }
                     },
-                    "color": "#14B8A6",
+                    "color": "#8B5CF6",
                     "itemStyle": {
                       "color": "#8B5CF6"
                     }
@@ -1385,8 +1385,18 @@
                       "itemStyle": {
                         "opacity": 0
                       }
-                    }
-                  ]
+                    },
+                    "Provisional / First Stage",
+                    "Confirmed Stage",
+                    "Continuous / Final Stage",
+                    "Substage Refined Stage"
+                  ],
+                  "selected": {
+                    "Provisional / First Stage": false,
+                    "Confirmed Stage": false,
+                    "Continuous / Final Stage": false,
+                    "Substage Refined Stage": true
+                  }
                 },
                 "graphic": [
                   {
@@ -1559,7 +1569,7 @@
       },
       {
         "id": "td_segmentation_chart_scatter",
-        "title": "Stage Segmentation — Model Stages (top) vs Ground Truth (bottom)",
+        "title": "Stage Segmentation \u2014 Model Stages (top) vs Ground Truth (bottom)",
         "description": "Merged stage segmentation windows over whole-well telemetry.",
         "isDataLarge": true,
         "chrome": {
@@ -2311,7 +2321,7 @@
                         "overflow": "truncate"
                       }
                     },
-                    "color": "#14B8A6",
+                    "color": "#8B5CF6",
                     "itemStyle": {
                       "color": "#8B5CF6"
                     }
@@ -2327,8 +2337,18 @@
                   "data": [
                     "Pressure (psi)",
                     "Rate (bpm)",
-                    "Concentration (ppa)"
-                  ]
+                    "Concentration (ppa)",
+                    "Provisional / First Stage",
+                    "Confirmed Stage",
+                    "Continuous / Final Stage",
+                    "Substage Refined Stage"
+                  ],
+                  "selected": {
+                    "Provisional / First Stage": false,
+                    "Confirmed Stage": false,
+                    "Continuous / Final Stage": false,
+                    "Substage Refined Stage": true
+                  }
                 },
                 "graphic": [
                   {
