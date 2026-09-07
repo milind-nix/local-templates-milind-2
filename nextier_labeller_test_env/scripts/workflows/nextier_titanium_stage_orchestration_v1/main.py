@@ -670,16 +670,40 @@ async def _process_well(
         enriched = enriched[pd.to_datetime(enriched["record_ts"], errors="coerce") < effective_end_ts]
     enriched = enriched.rename(columns={"name": "well_name", "id": "well_id"})
 
-    # Prefer the source id for upsert compatibility with raw telemetry. If an
-    # id is missing, build a stable per-row key instead of collapsing rows into
-    # a shared null/nan key.
+    # Prefer the source id for upsert compatibility with raw telemetry -- but
+    # ONLY when it is actually a per-row identifier.
+    #
+    # `telemetry_point_id` is the PRIMARY KEY of the labels featurestore, so a
+    # value repeated across rows does not merely look wrong, it upserts every
+    # one of those rows onto a single record. On this datastore `id` is a
+    # per-WELL identifier: AUSTIN 474-1004H carries the literal 'WELL02' on all
+    # 579,837 of its rows, so the whole well collapsed to ONE label row and the
+    # detection chart had nothing to draw.
+    #
+    # It went unnoticed because the wells titanium had run on carry a NULL `id`
+    # and so took the fallback branch, which is per-row and correct (prod's
+    # keys all look like 'WELL:2025-01-24T16:10:50.000000:0'). AUSTIN is simply
+    # the first well with a populated non-unique `id` to be run.
+    #
+    # So: use the source id only if it is unique across the frame, otherwise
+    # build the composite key. The fallback format is unchanged, so rows
+    # already written under it upsert in place rather than duplicating.
     row_key_ts = pd.to_datetime(enriched["record_ts"], errors="coerce").dt.strftime("%Y-%m-%dT%H:%M:%S.%f")
     source_ids = enriched["well_id"] if "well_id" in enriched else pd.Series([None] * len(enriched), index=enriched.index)
-    enriched["telemetry_point_id"] = np.where(
-        source_ids.notna(),
-        source_ids.astype(str),
-        enriched["well_name"].astype(str) + ":" + row_key_ts.fillna("") + ":" + enriched.index.astype(str),
+    composite = (
+        enriched["well_name"].astype(str) + ":" + row_key_ts.fillna("") + ":" + enriched.index.astype(str)
     )
+    ids_usable = bool(source_ids.notna().all()) and bool(source_ids.nunique() == len(enriched))
+    if not ids_usable and bool(source_ids.notna().any()):
+        logger.warning(
+            "Titanium source id is not a per-row key well=%s rows=%s distinct_ids=%s sample=%r "
+            "-- using composite telemetry_point_id (using the id would collapse the well to "
+            "%s label row(s))",
+            well_name, len(enriched), int(source_ids.nunique()),
+            str(source_ids.dropna().iloc[0]) if source_ids.notna().any() else None,
+            int(source_ids.nunique()),
+        )
+    enriched["telemetry_point_id"] = source_ids.astype(str) if ids_usable else composite
     enriched["algorithm_version"] = algorithm_version
     enriched["source_mode"] = mode
     enriched["processed_at"] = now_utc()
