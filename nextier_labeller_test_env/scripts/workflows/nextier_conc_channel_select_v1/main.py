@@ -275,12 +275,37 @@ async def _already_selected(workspace_id: int, output_key: str) -> set[str]:
     return {str(x) for x in df["well_name"].dropna().tolist()}
 
 
+async def _conc_columns_present(workspace_id: int, source_key: str) -> list[str]:
+    """Which concentration columns this datastore actually has.
+
+    `prop_conc` is a legacy alias for auger that `columns_for_conc_slot` still
+    checks, but it does not exist on every datastore -- naming it unconditionally
+    makes the whole SELECT fail with UndefinedColumn. Probe once per run and take
+    only what is there.
+    """
+    frame = await query_store(
+        sql=f"SELECT * FROM datastore:{source_key} LIMIT 1",
+        workspace_id=workspace_id,
+        params={},
+    )
+    df = frame.to_pandas() if isinstance(frame, pl.DataFrame) else pd.DataFrame(frame)
+    have = {str(c) for c in df.columns}
+    cols = [c for c in (*CONC_COLUMNS.values(), *AUGER_ALIASES) if c in have]
+    if not cols:
+        raise RuntimeError(
+            f"{source_key} has none of the concentration columns "
+            f"{(*CONC_COLUMNS.values(), *AUGER_ALIASES)} -- nothing to score"
+        )
+    return cols
+
+
 async def _load_window(
-    workspace_id: int, source_key: str, well: str, t0: str, t1: str
+    workspace_id: int, source_key: str, well: str, t0: str, t1: str,
+    conc_cols: list[str],
 ) -> pd.DataFrame:
     """Telemetry between t0 and t1. One query spans all scored stages; the
     per-stage slices are cut from it in-process rather than re-querying."""
-    cols = ", ".join(sorted({*CONC_COLUMNS.values(), *AUGER_ALIASES}))
+    cols = ", ".join(conc_cols)
     frame = await query_store(
         sql=f"""
             SELECT record_ts, {cols}
@@ -339,6 +364,9 @@ async def nextier_conc_channel_select_v1_flow(
         return {"wells": 0, "written": 0, "skipped": 0, "empty": 0}
 
     done = await _already_selected(workspace_id, output_featurestore_key) if skip_completed else set()
+    conc_cols = await _conc_columns_present(workspace_id, source_datastore_key)
+    logger.info("Conc channel select: datastore has channels %s", ",".join(conc_cols))
+
     processed_at = format_dt(now_utc())
     rows: list[dict[str, Any]] = []
     skipped = empty = 0
@@ -356,7 +384,7 @@ async def nextier_conc_channel_select_v1_flow(
                  for _n, r in grp.iterrows()]
         lo, hi = spans[0][1], spans[-1][2]
         # One query covering every scored stage; slices are cut in-process.
-        frame = await _load_window(workspace_id, source_datastore_key, well, lo, hi)
+        frame = await _load_window(workspace_id, source_datastore_key, well, lo, hi, conc_cols)
         base = {
             "well_name": well, "stage_num": float(spans[0][0]), "t0": lo, "t1": hi,
             "algorithm_version": algorithm_version, "source_mode": "historical",
