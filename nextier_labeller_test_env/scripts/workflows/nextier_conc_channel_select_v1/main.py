@@ -298,6 +298,7 @@ async def _load_window(
 @flow(name="nextier_conc_channel_select_v1")
 async def nextier_conc_channel_select_v1_flow(
     workspace_id: int,
+    workflow_id: int | None = None,
     source_datastore_key: str = SOURCE_DATASTORE_KEY,
     substage_index_featurestore_key: str = SUBSTAGE_INDEX_KEY,
     output_featurestore_key: str = OUTPUT_KEY,
@@ -312,6 +313,8 @@ async def nextier_conc_channel_select_v1_flow(
     dry_run: bool = False,
     algorithm_version: str = ALGORITHM_VERSION,
 ) -> dict[str, Any]:
+    del workflow_id  # Platform flow contract -- injected on every run, unused here.
+
     logger = get_run_logger()
     run_id = str(now_utc().value)
 
