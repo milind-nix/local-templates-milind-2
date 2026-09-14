@@ -1,38 +1,27 @@
 """Well-level auto-select of the concentration channel the dashboards default to.
 
-Port of the nextier-dash "conc channel auto-select" handoff
-(`docs/conc_channel_auto_select_handoff.md`, commit 696a11a7) onto the platform.
+Thin orchestration around nextier-dash's own selector -- the algorithm lives in
+`nextier_utils.labeling.auto.conc_channel_select`, exactly as the sapphire and
+titanium workflows call `run_well` and `titanium_merge`. Nothing here
+reimplements it.
 
 WHAT IT DOES
-    For each well, score the four concentration channels on that well's first
-    THREE substage-refined stage windows (open_well -> close_well) and persist one
-    row saying which channel the dropdown should default to. Each window is scored
-    into a tier; the best tier across the windows wins, later stage breaking a tie:
-
-        stairstep_starts_at_0  (3)  starts near zero AND passes the stairstep gate
-        stairstep              (2)  passes the gate but does not start near zero
-        fallback_present       (1)  first channel with finite data, in order
-        no_candidate           (0)  nothing usable
-
-    Ties within a tier break auger -> target -> denso -> inline.
-
-    Scoring three stages rather than one matters: a thin first stage leaves every
-    live channel `flat_no_signal` (AUSTIN 474-1004H, 695 rows) and decides the well
-    on no evidence.
+    For each well, hand `select_conc_channel_for_well` the first three
+    substage-refined stage windows and persist the row it returns, so the
+    concentration dropdown can default per well. The tiers, the ordering and
+    the stairstep gate are upstream's; see
+    `docs/conc_channel_auto_select_handoff.md` in nextier-dash.
 
 WHAT IT DOES NOT DO
     It does not change which channel any labelling algorithm uses. Titanium and
-    Sapphire keep resolving their own channel (`CONC_CHANNEL_ORDER`, and
-    Sapphire's zeroed-baseline `_usable` guard). This store is a UI default only,
-    and the dropdown stays manually overridable. Note the tie-break here puts
-    DENSO BEFORE INLINE, which is deliberately different from the global order --
-    do not "align" them.
+    Sapphire keep resolving their own channel. This store is a UI default only,
+    and the dropdown stays manually overridable.
 
 WHY IT READS THE REFINED INDEX INSTEAD OF RE-RUNNING SAPPHIRE
-    The handoff computes the window from live sapphire placements. We already
-    persisted exactly that window per stage in the titanium substage index, so
-    this flow needs one telemetry window per well rather than a full re-placement
-    -- 396 wells of one stage each, not a nine-hour fleet pass.
+    Upstream computes the windows from live sapphire placements. We already
+    persisted exactly those windows per stage in the titanium substage index, so
+    this flow needs one telemetry window per well rather than a full
+    re-placement -- 396 wells of three stages each, not a nine-hour fleet pass.
 """
 from __future__ import annotations
 
@@ -76,149 +65,13 @@ CONC_COLUMNS: dict[str, str] = {
 }
 AUGER_ALIASES = ("prop_conc",)
 # Denso BEFORE inline -- this selector only. See the module docstring.
-SELECT_ORDER = ("auger", "target", "denso", "inline")
+# Physical column -> the slot name the dashboard dropdown uses. Upstream returns
+# a column; the UI selects by slot.
 COL_TO_SLOT = {v: k for k, v in CONC_COLUMNS.items()} | {a: "auger" for a in AUGER_ALIASES}
 
-_EARLY_START_N = 12
-_MIN_ZERO = 0.01
+# Upstream's own default; read from the module at run time so a change there
+# does not silently disagree with the window planner here.
 MAX_CONC_SELECT_STAGES = 3
-
-# Higher is better. Mirrors upstream `_TIER_RANK`.
-_TIER_RANK = {"stairstep_starts_at_0": 3, "stairstep": 2,
-              "fallback_present": 1, "no_candidate": 0}
-
-
-def _load_gate():
-    """Prefer nextier-dash's own gate; fall back to the vendored copy.
-
-    Upstream is the source of truth, but its selector module does
-    `from src.analysis.stairstep_fit import ...` and the wheel ships only
-    `src/nextier_core` and `src/nextier_utils`. Wherever only the wheel is
-    installed that import raises, so we cannot depend on it being there.
-    """
-    try:
-        from src.analysis.stairstep_fit import fit_stage, normalize_minmax  # type: ignore
-
-        return fit_stage, normalize_minmax, "upstream"
-    except Exception:  # noqa: BLE001
-        from scripts.workflows.nextier_conc_channel_select_v1.stairstep_fit import (
-            fit_stage,
-            normalize_minmax,
-        )
-
-        return fit_stage, normalize_minmax, "vendored"
-
-
-def _starts_near_zero(series: pd.Series) -> bool:
-    """True when the series ALREADY starts near zero -- raw, uncorrected.
-
-    Baseline correction is for display and shape analysis AFTER a channel is
-    chosen, never inside the selection predicate. Correcting first subtracts the
-    first-n mean, so those samples average exactly 0, `.clip(lower=0)` kills the
-    negative half and the min is 0.0 -- every offset channel passes and only a
-    channel whose idle floor sits between the correction band (3.0) and the zero
-    test (0.01) fails. On our fleet that put 21 wells on a densometer reading
-    10-15 ppa over an auger sitting at zero. Fixed upstream in nextier-dash
-    7d21a352; this mirrors it.
-    """
-    vals = pd.to_numeric(series, errors="coerce").dropna()
-    if vals.empty:
-        return False
-    return float(vals.iloc[: max(1, _EARLY_START_N)].min()) <= _MIN_ZERO
-
-
-def _is_stairstep(series: pd.Series, fit_stage, normalize_minmax) -> tuple[bool, dict]:
-    vals = pd.to_numeric(series, errors="coerce").to_numpy(dtype=float)
-    finite = vals[np.isfinite(vals)]
-    if finite.size < 10:
-        return False, {"reject_reason": "too_few_samples", "n_steps": -1}
-    shape = normalize_minmax(finite)
-    if float(shape.max()) < 0.5:
-        return False, {"reject_reason": "flat_no_signal", "n_steps": -1}
-    fit = fit_stage(shape)
-    return (not fit.get("reject_reason")), fit
-
-
-def _resolve_col(window: pd.DataFrame, slot: str) -> str | None:
-    names = (CONC_COLUMNS[slot], *AUGER_ALIASES) if slot == "auger" else (CONC_COLUMNS[slot],)
-    for col in names:
-        if col not in window.columns:
-            continue
-        vals = pd.to_numeric(window[col], errors="coerce").dropna()
-        if not vals.empty and bool(np.isfinite(vals).any()):
-            return col
-    return None
-
-
-def _score_window(window: pd.DataFrame, stage_n: int) -> dict[str, Any]:
-    """Score one refined stage window into a tier. Pure CPU."""
-    fit_stage, normalize_minmax, _src = _load_gate()
-    notes: dict[str, Any] = {}
-    stair_zero: list[str] = []
-    stair_only: list[str] = []
-    present: list[str] = []
-
-    for slot in SELECT_ORDER:
-        col = _resolve_col(window, slot)
-        if col is None:
-            notes[CONC_COLUMNS[slot]] = {
-                "present": False, "starts_at_0": False, "is_stairstep": False,
-                "reject_reason": "missing_or_all_nan", "n_steps": -1,
-            }
-            continue
-        series = pd.to_numeric(window[col], errors="coerce")
-        zero = _starts_near_zero(series)
-        ok, fit = _is_stairstep(series, fit_stage, normalize_minmax)
-        notes[col] = {
-            "present": True, "starts_at_0": bool(zero), "is_stairstep": bool(ok),
-            "reject_reason": "" if ok else str(fit.get("reject_reason") or "rejected"),
-            "n_steps": int(fit.get("n_steps", -1) or -1),
-        }
-        present.append(col)
-        if ok and zero:
-            stair_zero.append(col)
-        elif ok:
-            stair_only.append(col)
-
-    if stair_zero:
-        pick, reason, cands = stair_zero[0], "stairstep_starts_at_0", stair_zero
-    elif stair_only:
-        pick, reason, cands = stair_only[0], "stairstep", []
-    elif present:
-        # First channel with data, in order -- NOT "first that starts at zero".
-        # That older rule ran through the inverted zero test and is what elected
-        # densometers over augers.
-        pick, reason, cands = present[0], "fallback_present", []
-    else:
-        pick, reason, cands = None, "no_candidate", []
-    return {"conc_col": pick, "candidates": cands, "reason": reason,
-            "stage_n": int(stage_n), "channel_notes": notes}
-
-
-def select_conc_channel(windows: list[tuple[int, pd.DataFrame]]) -> dict[str, Any]:
-    """Score up to MAX_CONC_SELECT_STAGES windows; best tier wins.
-
-    A tie on tier goes to the LATER stage -- stage 1 is often short or ragged,
-    so a later window scoring the same tier is the better evidence.
-    """
-    scored = [_score_window(w, sn) for sn, w in windows if not w.empty]
-    if not scored:
-        return {"conc_col": None, "candidates": [], "reason": "empty first-stage window",
-                "stage_n": None, "channel_notes": {}, "refine_n": 0, "stages_scored": []}
-
-    best = scored[0]
-    by_stage: dict[str, Any] = {}
-    for r in scored:
-        by_stage[str(r["stage_n"])] = {"conc_col": r["conc_col"], "reason": r["reason"],
-                                       "channels": r["channel_notes"]}
-        rank_b, rank_a = _TIER_RANK.get(r["reason"], -1), _TIER_RANK.get(best["reason"], -1)
-        if rank_b > rank_a or (rank_b == rank_a and r["stage_n"] >= best["stage_n"]):
-            best = r
-    out = dict(best)
-    out["channel_notes"] = dict(best["channel_notes"], by_stage=by_stage)
-    out["refine_n"] = len(scored)
-    out["stages_scored"] = sorted(r["stage_n"] for r in scored)
-    return out
 
 
 async def _first_refined_windows(
@@ -344,12 +197,17 @@ async def nextier_conc_channel_select_v1_flow(
     run_id = str(now_utc().value)
 
     wells = combine_well_names(well_name, normalize_name_list(well_names))
-    _f, _n, gate_source = _load_gate()
+    # Log the upstream module that will do the work, so a run says which
+    # nextier-dash the image carries -- the equivalent of sapphire logging
+    # `ds_callable`.
+    import nextier_utils.labeling.auto.conc_channel_select as _sel
+
     logger.info(
-        "Conc channel select start index=%s output=%s gate=%s max_wells=%s "
-        "skip_completed=%s dry_run=%s",
-        substage_index_featurestore_key, output_featurestore_key, gate_source,
-        max_wells, skip_completed, dry_run,
+        "Conc channel select start index=%s output=%s selector=%s max_stages=%s "
+        "max_wells=%s skip_completed=%s dry_run=%s",
+        substage_index_featurestore_key, output_featurestore_key,
+        f"{_sel.__name__}.select_conc_channel_for_well",
+        _sel.MAX_CONC_SELECT_STAGES, max_wells, skip_completed, dry_run,
     )
 
     plan = await _first_refined_windows(
@@ -367,6 +225,15 @@ async def nextier_conc_channel_select_v1_flow(
     conc_cols = await _conc_columns_present(workspace_id, source_datastore_key)
     logger.info("Conc channel select: datastore has channels %s", ",".join(conc_cols))
 
+    # Imported here rather than at module scope, matching sapphire and titanium:
+    # the package is installed into the job image from nextier-dash, so a version
+    # mismatch fails this run rather than stopping the flow from importing at all.
+    from nextier_core.stage_utils import DATETIME_COL
+    from nextier_utils.labeling.auto.conc_channel_select import (
+        MAX_CONC_SELECT_STAGES as UPSTREAM_MAX_STAGES,
+        select_conc_channel_for_well,
+    )
+
     processed_at = format_dt(now_utc())
     rows: list[dict[str, Any]] = []
     skipped = empty = 0
@@ -379,11 +246,10 @@ async def nextier_conc_channel_select_v1_flow(
         if well in done:
             skipped += 1
             continue
-        grp = grp.sort_values("stage_num")
+        grp = grp.sort_values("stage_num").head(int(UPSTREAM_MAX_STAGES))
         spans = [(int(r["stage_num"]), format_dt(r["stage_start_ts"]), format_dt(r["stage_end_ts"]))
                  for _n, r in grp.iterrows()]
         lo, hi = spans[0][1], spans[-1][2]
-        # One query covering every scored stage; slices are cut in-process.
         frame = await _load_window(workspace_id, source_datastore_key, well, lo, hi, conc_cols)
         base = {
             "well_name": well, "stage_num": float(spans[0][0]), "t0": lo, "t1": hi,
@@ -399,34 +265,40 @@ async def nextier_conc_channel_select_v1_flow(
                          "refine_n": 0.0, "stages_scored": "[]"})
             continue
 
-        ts = pd.to_datetime(frame["record_ts"], errors="coerce")
-        windows = []
-        for sn, a, b in spans:
-            sub = frame.loc[(ts >= pd.Timestamp(a)) & (ts <= pd.Timestamp(b))]
-            if not sub.empty:
-                windows.append((sn, sub))
+        # Upstream indexes on DATETIME_COL and takes its windows as `placements`;
+        # ours come from the persisted substage index, so build the same shape it
+        # gets from a live sapphire run. `event_window_from_placement` prefers
+        # open_well/close_well, which is exactly what those columns already hold.
+        compute = frame.rename(columns={"record_ts": DATETIME_COL})
+        placements = [
+            {"stage_n": sn, "t0": pd.Timestamp(a), "t1": pd.Timestamp(b),
+             "open_well__t": pd.Timestamp(a), "close_well__t": pd.Timestamp(b)}
+            for sn, a, b in spans
+        ]
 
         # Off the event loop -- numpy over four channels on up to three windows is
-        # long enough for a Prefect lease renewal to land inside it.
-        result = await asyncio.to_thread(select_conc_channel, windows)
+        # long enough for a Prefect lease renewal to land inside it and kill the run.
+        result = await asyncio.to_thread(
+            select_conc_channel_for_well, well, compute, placements=placements
+        )
 
-        slot = COL_TO_SLOT.get(result["conc_col"] or "", None)
+        slot = COL_TO_SLOT.get(result.conc_col or "", None)
         rows.append({
             **base,
-            "stage_num": float(result["stage_n"]) if result.get("stage_n") is not None else float(spans[0][0]),
-            "conc_col": result["conc_col"],
+            "stage_num": float(result.stage_n) if result.stage_n is not None else float(spans[0][0]),
+            "conc_col": result.conc_col,
             "concentration_feature": slot,
-            "candidates": json.dumps(result["candidates"]),
-            "reason": result["reason"],
-            "channel_notes": json.dumps(result["channel_notes"]),
+            "candidates": json.dumps(list(result.candidates)),
+            "reason": result.reason,
+            # upstream already JSON-encodes this, including its by_stage map
+            "channel_notes": result.to_row()["channel_notes"],
             "sample_count": float(len(frame)),
-            "refine_n": float(result.get("refine_n", 0)),
-            "stages_scored": json.dumps(result.get("stages_scored", [])),
+            "refine_n": float(result.refine_n),
+            "stages_scored": json.dumps([int(x) for x in result.stages_scored]),
         })
         logger.info(
             "Conc channel select well=%s stages=%s rows=%s pick=%s slot=%s reason=%s",
-            well, result.get("stages_scored"), len(frame), result["conc_col"], slot,
-            result["reason"],
+            well, result.stages_scored, len(frame), result.conc_col, slot, result.reason,
         )
 
     if not rows:
