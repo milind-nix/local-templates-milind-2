@@ -178,6 +178,18 @@
       "processed_at": {
         "type": "string",
         "description": "When the row was written."
+      },
+      "rampdown_start_ts": {
+        "type": "string",
+        "description": "Anomaly-gate landmark, NOT a substage. Closes the anomaly window: anomalies fire in (ttr, rampdown_start]. First sustained leave from design rate (< 0.90x for >= 30s) that never RECOVERS to >= 0.95x -- so a mid-stage dip does not end the window, unlike detect_auto_rampdown_boundaries. Null when abstained."
+      },
+      "rampdown_start_src": {
+        "type": "string",
+        "description": "Detector that placed rampdown_start, e.g. 'anomaly rampdown (non-recovering)'."
+      },
+      "rampdown_start_abstain_reason": {
+        "type": "string",
+        "description": "Why rampdown_start was not placed, verbatim (e.g. 'no ttr to search after', 'no design rate for rampdown search'). NULL means it was placed. Coverage here is expected to be materially lower than ttr -- a stage whose rate never leaves design without recovering has no rampdown_start, and contributes NO anomaly rows."
       }
     },
     "required": [

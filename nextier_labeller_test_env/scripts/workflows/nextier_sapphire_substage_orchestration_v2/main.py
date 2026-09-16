@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 import sys
 from typing import Any
@@ -59,6 +60,18 @@ LANDMARKS = (
     "stage_end",
     "close_well",
 )
+
+# rampdown_start is NOT one of the seven. Upstream keeps the same split --
+# `_ANOMALY_GATE_KEYS` in sapphire/pipeline.py, "an anomaly-gate landmark (not a
+# public row substage)" -- and `run_well` already returns it on every placement
+# row alongside the others, so only the summary has to widen to catch it. It must
+# stay out of LANDMARKS: that tuple is the substage vocabulary, and a gate
+# boundary emitted as a substage would show up as a band on every chart.
+#
+# It closes the anomaly window: anomalies fire in (ttr, rampdown_start], and
+# unlike detect_auto_rampdown_boundaries this is the first sustained leave from
+# design rate that never RECOVERS, so a mid-stage dip no longer ends the window.
+ANOMALY_GATE_LANDMARKS = ("rampdown_start",)
 
 # aug27 keeps the COARSE window on stage_start_ts / stage_end_ts and prefixes the
 # DETECTED landmarks (auto_stage_start_ts). Same split here so a landmark can never
@@ -215,7 +228,7 @@ def _placement_rows(
             "run_id": run_id,
             "processed_at": processed_at,
         }
-        for lm in LANDMARKS:
+        for lm in (*LANDMARKS, *ANOMALY_GATE_LANDMARKS):
             col = _landmark_prefix(lm)
             out[f"{col}_ts"] = format_dt(parse_dt(row.get(f"{lm}__t")))
             out[f"{col}_src"] = row.get(f"{lm}__src")
@@ -472,16 +485,61 @@ def _label_rows(
         keyed = raw.copy()
         keyed["record_ts"] = keyed["record_ts"].map(lambda v: format_dt(parse_dt(v)))
         keep = [c for c in ("record_ts", "telemetry_point_id", "created_ts") if c in keyed.columns]
-        out = out.merge(keyed[keep].drop_duplicates("record_ts"), on="record_ts", how="left")
+
+        # MATCH ON POSITION WITHIN THE TIMESTAMP -- collapsing here loses rows.
+        #
+        # `record_ts` is NOT unique in this telemetry. Duplicated timestamps are
+        # separate samples, not copies: on JUNO 26 25 STATE COM 705H W0LI, 47,320
+        # of 453,019 rows share a timestamp with another row, and each carries a
+        # distinct rate, pressure and created_ts.
+        #
+        # `drop_duplicates("record_ts")` + a merge on `record_ts` alone therefore
+        # handed every row of such a group the FIRST row's telemetry_point_id.
+        # `sapphire_label_id` is built from that id, so the upsert kept one and
+        # silently dropped the rest -- 583,643 labels of 73,014,893 fleet-wide
+        # (0.80%), and up to 10.5% on the worst wells. Titanium keys on
+        # telemetry_point_id directly and loses none, which is what proved this
+        # was ours and not a data limit.
+        #
+        # `prepare_raw_frame` already built the disambiguator: telemetry_point_id
+        # is `{name}:{record_ts}:{_row_seq}`. Recover the same ordinal on both
+        # sides and join on it.
+        #
+        # The `out` side groups by (stage_n, record_ts), not record_ts alone,
+        # because `placements_to_labels_df` emits one contiguous
+        # `df_well.iloc[i_fire:i_hi+1]` slice per stage and those slices can
+        # OVERLAP -- `i_hi` is extended to close_well, which can reach past the
+        # next stage's start. A global ordinal would mis-number every row after
+        # the first overlap; a per-stage one restarts with each slice, matching
+        # how the frame was built. Slice edges land on timestamp-group
+        # boundaries (`searchsorted` left for the start, `right`-1 for the end),
+        # so a group is not normally split across two slices.
+        #
+        # Not provably exact: the close_well extension uses a left searchsorted,
+        # so a slice can rarely end on the first row of a duplicate group. Such
+        # a row finds no partner and falls through to the composite below, which
+        # carries `_seq` and so still yields a unique id. Strictly better than
+        # collapsing, and no new failure mode.
+        keyed = keyed[keep].copy()
+        keyed["_seq"] = keyed.groupby("record_ts", sort=False).cumcount()
+        seq_keys = ["stage_n", "record_ts"] if "stage_n" in out.columns else ["record_ts"]
+        out["_seq"] = out.groupby(seq_keys, sort=False).cumcount()
+        out = out.merge(keyed, on=["record_ts", "_seq"], how="left")
 
     # Fall back to a deterministic composite when the source row id did not survive
     # the join -- the surrogate below is built from it, so it has to be stable.
     if "telemetry_point_id" not in out.columns:
         out["telemetry_point_id"] = None
+    # `_seq` rides along so an unmatched row keeps a unique id rather than
+    # colliding with the row it failed to join to.
+    _seq_suffix = (
+        ":" + out["_seq"].astype(str) if "_seq" in out.columns else ""
+    )
     out["telemetry_point_id"] = out["telemetry_point_id"].where(
         out["telemetry_point_id"].notna(),
-        identity["well_name"] + ":" + out["record_ts"].fillna(""),
+        identity["well_name"] + ":" + out["record_ts"].fillna("") + _seq_suffix,
     )
+    out = out.drop(columns=["_seq"], errors="ignore")
 
     # Surrogate primary key, following aug27's auto_label_id rather than keying on
     # the telemetry row. One sample can carry a label from more than one algorithm
@@ -623,12 +681,72 @@ async def _process_well(
         return {"well_name": well_name, "status": "empty", "stages": 0}
 
     raw = prepare_raw_frame(raw_pl)
+
+    # USABLE means finite AND not identically zero -- not merely present.
+    #
+    # A `notna()` test passes a channel that is populated with 0.0 on every row,
+    # and two of the priority wells are exactly that: HOWITZER 0226-30H carries
+    # 120,538 non-null auger samples and NAIAD 15-03 3AH carries 441,731, every
+    # one of them 0.0. That is worse here than it was in titanium, because
+    # `conc_kwargs` below PINS the algorithm to this one column via `conc_cols`
+    # and the titanium_merge fallback drops the other channels from the frame --
+    # so a dead pick cannot be recovered downstream. The concentration landmarks
+    # (pad_end, ttr, slurry_end) then read a flat zero trace and abstain.
+    #
+    # So: prefer the requested channel, fall back to the best channel that
+    # actually carries signal, and only give up when none does.
+    def _usable(col: str) -> bool:
+        """Finite, not identically zero, AND zeroed -- all three.
+ 
+        The first two are not enough. Sapphire's concentration landmarks require a
+        ZEROED ppa channel: one that returns to ~0 between stages, because pad_end
+        and slurry_end are found by measuring a pre-stage baseline and detecting
+        departure from it. A densometer does not do that -- it reads the fluid it
+        is sitting in, so it carries a standing offset.
+ 
+        Measured on the two wells this actually bites:
+            HOWITZER 0226-30H  denso p10 11.53 / p50 24.95  -> rejected by v6 with
+                               "baseline 25.0 outside v6's band", pad_end 0 of 55
+            NAIAD 15-03 3AH    denso p10  9.79              -> "baseline 9.8", 0 of 74
+            both wells         target p10  0.00, max 5.0/2.5 -> the real ppa channel
+        On healthy wells auger is already zeroed (p10 0.00), so this changes nothing
+        there -- the requested channel still wins.
+ 
+        The band is relative, not absolute: a baseline is "at zero" when it is small
+        against the channel's own working range, so this does not assume ppa units.
+        """
+        if col not in raw.columns:
+            return False
+        a = pd.to_numeric(raw[col], errors="coerce").to_numpy(dtype=float)
+        f = np.isfinite(a)
+        if not f.any():
+            return False
+        a = a[f]
+        if not (a != 0).any():
+            return False
+        baseline = float(np.percentile(a, 10))
+        span = float(np.percentile(a, 99))
+        return abs(baseline) <= max(0.5, 0.05 * abs(span))
+
     conc_col = CONC_COLUMNS[concentration_feature]
-    if conc_col not in raw.columns or raw[conc_col].notna().sum() == 0:
-        # Not fatal. Several landmarks need concentration and will abstain
-        # without it -- an abstention is recorded, so this stays visible.
-        logger.info("Sapphire concentration unavailable well=%s column=%s", well_name, conc_col)
-        conc_col = None
+    if not _usable(conc_col):
+        alternative = next(
+            (c for c in CONC_COLUMNS.values() if c != conc_col and _usable(c)), None
+        )
+        if alternative:
+            logger.warning(
+                "Sapphire concentration channel is present but all-zero well=%s "
+                "requested=%s falling back to=%s", well_name, conc_col, alternative,
+            )
+            conc_col = alternative
+        else:
+            # Not fatal. Several landmarks need concentration and will abstain
+            # without it -- an abstention is recorded, so this stays visible.
+            logger.warning(
+                "Sapphire no usable concentration channel on this well well=%s requested=%s",
+                well_name, conc_col,
+            )
+            conc_col = None
 
     identity = {
         "fleet_name": pending["fleet_name"].iloc[0] if "fleet_name" in pending else None,
@@ -787,17 +905,41 @@ async def _process_well(
     # `conc_col` is None and the default order plus the bronze fallback in
     # `pad_channel` is the better behaviour than pinning to a dead column.
     conc_kwargs = {"conc_cols": (conc_col,)} if conc_col else {}
-    placements = run_sapphire_well(
-        well_name,
-        df=compute,
-        rate_col="rate_slurry",
-        press_col="press_mainline",
-        stages=stage_windows,
-        stage_masses=stage_masses or None,
-        stage_source=stage_source,
-        **conc_kwargs,
-    )
-    labels = placements_to_labels_df(well_name, compute, _label_spans(placements))
+
+    def _compute_well() -> tuple[Any, Any]:
+        """The CPU-bound half of a well, isolated so it can leave the event loop.
+
+        `run_sapphire_well` and `placements_to_labels_df` are synchronous numpy
+        and pandas -- on a 600k-row well they hold the interpreter for one to
+        three minutes. Called directly from this async flow they block the loop,
+        and Prefect renews the deployment's concurrency lease FROM that loop. A
+        renewal that falls inside one of these calls never fires, the server
+        reclaims the slot, and the run is killed mid-well:
+
+            Concurrency lease renewal failed - slots are no longer reserved.
+            Terminating execution to prevent over-allocation.
+
+        That killed the 09-09 backfill twice, at 3.5 h and 1.9 h. It is a race,
+        not a duration threshold -- a 142 s compute survived while a 78 s one
+        died -- because what matters is whether a renewal deadline happens to
+        land inside the blocking call, which no amount of batching avoids.
+
+        Neither callee touches Prefect, so a plain worker thread is enough and
+        the run context does not need to be carried across.
+        """
+        placed = run_sapphire_well(
+            well_name,
+            df=compute,
+            rate_col="rate_slurry",
+            press_col="press_mainline",
+            stages=stage_windows,
+            stage_masses=stage_masses or None,
+            stage_source=stage_source,
+            **conc_kwargs,
+        )
+        return placed, placements_to_labels_df(well_name, compute, _label_spans(placed))
+
+    placements, labels = await asyncio.to_thread(_compute_well)
 
     class _Result:  # keeps the row builders below unchanged
         pass
