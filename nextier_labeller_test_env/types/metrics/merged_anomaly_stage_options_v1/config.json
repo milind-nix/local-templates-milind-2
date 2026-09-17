@@ -1,8 +1,8 @@
 {
   "key": "merged_anomaly_stage_options_v1",
   "displayName": "Merged Anomaly Stage Options",
-  "description": "Sapphire stage ordinals for a well, with the gate marked. Stages without a (ttr, rampdown_start] window can hold no anomalies, and the label says so rather than leaving the user to wonder why the chart is empty.",
-  "sql": "SELECT * FROM (\nSELECT '-1' AS value, 'Select stage' AS label, 0 AS sort_order\nUNION ALL\nSELECT DISTINCT CAST(CAST(s.stage_num AS DOUBLE PRECISION) AS TEXT) AS value,\n       CAST(CAST(s.stage_num AS DOUBLE PRECISION) AS TEXT)\n         || CASE WHEN s.ttr_ts IS NULL OR s.rampdown_start_ts IS NULL\n                 THEN ' (no gate)' ELSE '' END AS label,\n       1 AS sort_order\nFROM featurestore:nextier_substage_sapphire_sept3_stage_summary_v2 s\nWHERE s.well_name = :well_name\n  AND CAST(:well_name AS TEXT) NOT IN ('', '__ALL__')\n  AND s.stage_num IS NOT NULL\n) q\nORDER BY q.sort_order, CAST(q.value AS DOUBLE PRECISION)",
+  "description": "Sapphire stage ordinals for a well. Stages without a (ttr, rampdown_start] window hold no anomalies; that is visible in the Per-Stage Summary counts and in gate_status on merged_anomaly_stage_summary_v3, so the dropdown stays plain numbers.",
+  "sql": "SELECT * FROM (\nSELECT '-1' AS value, 'Select stage' AS label, 0 AS sort_order\nUNION ALL\nSELECT DISTINCT CAST(CAST(s.stage_num AS DOUBLE PRECISION) AS TEXT) AS value,\n       CAST(CAST(s.stage_num AS DOUBLE PRECISION) AS TEXT) AS label,\n       1 AS sort_order\nFROM featurestore:nextier_substage_sapphire_sept3_stage_summary_v2 s\nWHERE s.well_name = :well_name\n  AND CAST(:well_name AS TEXT) NOT IN ('', '__ALL__')\n  AND s.stage_num IS NOT NULL\n) q\nORDER BY q.sort_order, CAST(q.value AS DOUBLE PRECISION)",
   "valueSchema": {
     "type": "object",
     "properties": {
