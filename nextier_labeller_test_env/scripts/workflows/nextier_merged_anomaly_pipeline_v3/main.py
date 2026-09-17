@@ -192,6 +192,27 @@ def _join_times(well: str, telem: pd.DataFrame, logger: Any) -> list[Any]:
         return []
 
 
+def _joins_for_stage(joins: list[Any], t0: Any, t1: Any) -> list[Any]:
+    """Prior-piece fire times of merge joins falling inside [t0, t1].
+
+    `resolve_coarse_stages(...)["joins"]` yields (start, end, kind) TUPLES, not bare
+    timestamps -- `detect_mid_stage_shutdowns_from_joins` wants the fire times, which
+    are `item[0]`. Mirrors `_joins_for_stage` in upstream's
+    scripts/generate_anomaly_firstpass_stats.py.
+    """
+    out: list[Any] = []
+    lo, hi = pd.Timestamp(t0), pd.Timestamp(t1)
+    for item in joins or []:
+        if not item:
+            continue
+        fire = pd.Timestamp(item[0] if isinstance(item, (tuple, list)) else item)
+        if pd.isna(fire):
+            continue
+        if lo <= fire <= hi:
+            out.append(fire)
+    return out
+
+
 def _gate_indices(
     slice_df: pd.DataFrame, gate_start: Any, gate_end: Any
 ) -> tuple[int | None, int | None]:
@@ -262,15 +283,17 @@ def _prepare_outputs(
             gate_status = "no_rampdown" if rd_idx is None else "no_ttr"
 
     if gate_status == "ok":
-        sandwich = require_anomaly_min_length(detect_mid_stage_shutdowns(labels))
-        if joins:
-            sandwich = combine_mid_stage_shutdown_masks(
-                sandwich,
-                require_anomaly_min_length(
-                    detect_mid_stage_shutdowns_from_joins(labels, joins)
-                ),
-            )
-        shutdown_mask = sandwich & design_mask
+        # Upstream applies the min-length rule ONCE, after the union -- not to each
+        # mask separately. Filtering first can drop a short sandwich run that the
+        # join anchor would have extended into a qualifying one.
+        sandwich = detect_mid_stage_shutdowns(labels)
+        join_times = _joins_for_stage(
+            joins, candidate.get("first_source_ts"), candidate.get("last_source_ts")
+        )
+        if join_times:
+            join_mid = detect_mid_stage_shutdowns_from_joins(labels, join_times)
+            sandwich = combine_mid_stage_shutdown_masks(sandwich, join_mid)
+        shutdown_mask = require_anomaly_min_length(sandwich) & design_mask
         sweep_pre_mask, sweep_post_mask = detect_sweep_markers_around_mid_stage_shutdowns(
             labels, shutdown_mask, conc_col=conc_col,
         )
