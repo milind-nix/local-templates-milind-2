@@ -74,7 +74,6 @@ async def _candidate_stages(
     well_name: str | None,
     stage_num: float | None,
 ) -> list[dict[str, Any]]:
-    force = mode == "rebuild"
     rows = await query_store(
         sql=f"""
             WITH source_stages AS (
@@ -100,34 +99,44 @@ async def _candidate_stages(
                 AND (:stage_num < 0 OR CAST(s.stage_num AS DOUBLE PRECISION) = :stage_num)
               GROUP BY s.well_name, CAST(s.stage_num AS DOUBLE PRECISION)
             )
-            SELECT s.*
+            SELECT s.*, m.source_signature AS manifest_signature
             FROM source_stages s
             LEFT JOIN featurestore:{MANIFEST_KEY} m
               ON m.name = s.name
              AND m.stage_num = s.stage_num
              AND m.algorithm_version = :algorithm_version
-            WHERE :force_rebuild
-               OR m.name IS NULL
-               OR m.source_rows IS DISTINCT FROM s.source_rows
-               -- Compare at MILLISECOND precision. The featurestore write truncates a
-               -- datetime to ms, so the manifest holds 03:00:28.484000 where sapphire's
-               -- processed_at is 03:00:28.484189. A raw IS DISTINCT FROM is therefore
-               -- always true and `incremental` reprocesses the whole fleet every run --
-               -- no resumability, and a duplicate summary row per stage per run.
-               OR date_trunc('milliseconds', CAST(m.latest_source_updated_at AS timestamp))
-                    IS DISTINCT FROM date_trunc('milliseconds', s.latest_source_updated_at)
             ORDER BY s.name, s.stage_num
-            LIMIT {int(max_stages)}
         """,
         workspace_id=workspace_id,
         params={
             "algorithm_version": algorithm_version,
-            "force_rebuild": force,
             "well_name": (well_name or "").strip(),
             "stage_num": float(stage_num) if stage_num is not None else -1.0,
         },
     )
-    return rows.to_dicts() if not rows.is_empty() else []
+    # The "has this stage already been processed?" test lives here and not in a WHERE
+    # clause, because query_store re-generates the SQL through sqlglot with write
+    # dialect SQLITE (nixdlt/utils/sql.py::remove_optional_params). Two things did not
+    # survive that trip:
+    #   * date_trunc('milliseconds', x) came out as TIMESTAMP_TRUNC(x, MILLISECONDS),
+    #     which Postgres rejects -- `column "milliseconds" does not exist`.
+    #   * a bare `:force_rebuild` placeholder is not an exp.Predicate, so
+    #     process_conditions dropped it and `rebuild` silently ran as `incremental`.
+    # Comparing the manifest's stored source_signature needs no SQL functions at all,
+    # is immune to the featurestore write truncating a datetime to milliseconds
+    # (manifest 03:00:28.484000 vs sapphire's processed_at 03:00:28.484189, which made
+    # every stage look dirty), and covers every field the run depends on rather than
+    # the timestamp alone. max_stages is applied here for the same reason: a SQL LIMIT
+    # would cap the scan before the skip test, not the work after it.
+    force = mode == "rebuild"
+    out: list[dict[str, Any]] = []
+    for row in (rows.to_dicts() if not rows.is_empty() else []):
+        stored = row.pop("manifest_signature", None)
+        if force or not stored or stored != _source_signature(row, algorithm_version):
+            out.append(row)
+        if len(out) >= max_stages:
+            break
+    return out
 
 
 async def _conc_col_for(workspace_id: int, name: str) -> str:
