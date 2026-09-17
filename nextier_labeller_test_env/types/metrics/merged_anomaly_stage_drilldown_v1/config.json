@@ -1,0 +1,57 @@
+{
+  "key": "merged_anomaly_stage_drilldown_v1",
+  "displayName": "Merged Anomaly Stage Drilldown",
+  "description": "Telemetry for one sapphire stage, with the anomaly gate boundaries carried on every row so the chart can shade (ttr, rampdown_start]. Concentration comes from the channel the auto-selector chose for the well, not a hardcoded denso.",
+  "sql": "SELECT * FROM (\nWITH bounds AS (\n  SELECT CAST(s.stage_start_ts AS timestamp) AS start_ts,\n         CAST(s.stage_end_ts AS timestamp) AS end_ts,\n         CAST(s.ttr_ts AS timestamp) AS gate_start_ts,\n         CAST(s.rampdown_start_ts AS timestamp) AS gate_end_ts\n  FROM featurestore:nextier_substage_sapphire_sept3_stage_summary_v2 s\n  WHERE s.well_name = :well_name\n    AND CAST(s.stage_num AS DOUBLE PRECISION) = CAST(:stage_num AS DOUBLE PRECISION)\n  LIMIT 1\n)\nSELECT CAST(t.name AS TEXT) || ':' || CAST(t.record_ts AS TEXT) AS telemetry_point_id,\n       t.name AS well_name, t.record_ts AS timestamp,\n       CAST(:stage_num AS DOUBLE PRECISION) AS stage_num,\n       t.press_mainline, t.rate_slurry,\n       CASE (SELECT wc.concentration_feature FROM featurestore:nextier_well_conc_channel_v1 wc\n             WHERE wc.well_name = :well_name)\n         WHEN 'inline' THEN t.prop_conc_inline\n         WHEN 'target' THEN t.prop_conc_target\n         WHEN 'denso'  THEN t.prop_conc_blend_denso\n         ELSE t.prop_conc_blend_auger END AS selected_concentration,\n       b.gate_start_ts, b.gate_end_ts\nFROM datastore:merged_fleet_stream_customer_full_v2 t\nCROSS JOIN bounds b\nWHERE t.name = :well_name\n  AND t.record_ts >= b.start_ts AND t.record_ts <= b.end_ts\nORDER BY t.record_ts\n) q",
+  "valueSchema": {
+    "type": "object",
+    "properties": {
+      "telemetry_point_id": {
+        "type": "string"
+      },
+      "well_name": {
+        "type": "string"
+      },
+      "timestamp": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "stage_num": {
+        "type": "number"
+      },
+      "press_mainline": {
+        "type": "number"
+      },
+      "rate_slurry": {
+        "type": "number"
+      },
+      "selected_concentration": {
+        "type": "number"
+      },
+      "gate_start_ts": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "gate_end_ts": {
+        "type": "string",
+        "format": "date-time"
+      }
+    },
+    "required": []
+  },
+  "paramsSchema": {
+    "type": "object",
+    "properties": {
+      "well_name": {
+        "type": "string"
+      },
+      "stage_num": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "well_name",
+      "stage_num"
+    ]
+  }
+}

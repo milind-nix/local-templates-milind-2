@@ -1,0 +1,72 @@
+{
+  "key": "merged_anomaly_processing_manifest_v3",
+  "displayName": "Merged Anomaly Processing Manifest v3",
+  "description": "Active immutable anomaly run and source signature per well, stage, and algorithm version. Keyed on the SAPPHIRE stage ordinal (stage_num), not the TD ordinal -- anomalies are gated to sapphire's (ttr, rampdown_start] window.",
+  "sql": "SELECT CAST(NULL AS TEXT) AS fleet_name, CAST(NULL AS TEXT) AS pad_name, CAST(NULL AS TEXT) AS name, CAST(NULL AS DOUBLE PRECISION) AS stage_num, CAST(NULL AS TEXT) AS algorithm_version, CAST(NULL AS TEXT) AS active_run_id, CAST(NULL AS TEXT) AS source_signature, CAST(NULL AS BIGINT) AS source_rows, CAST(NULL AS TEXT) AS first_source_ts, CAST(NULL AS TEXT) AS last_source_ts, CAST(NULL AS TEXT) AS latest_source_updated_at, CAST(NULL AS TEXT) AS processed_at, CAST(NULL AS TEXT) AS status FROM datastore:merged_fleet_stream_customer_full_v2 WHERE 1 = 0",
+  "checkpoint_fields": [],
+  "upsert": true,
+  "dataSchema": {
+    "type": "object",
+    "properties": {
+      "fleet_name": {
+        "type": "string"
+      },
+      "pad_name": {
+        "type": "string"
+      },
+      "name": {
+        "type": "string",
+        "metadata": {
+          "isPrimaryKey": true
+        }
+      },
+      "stage_num": {
+        "type": "number",
+        "metadata": {
+          "isPrimaryKey": true
+        }
+      },
+      "algorithm_version": {
+        "type": "string",
+        "metadata": {
+          "isPrimaryKey": true
+        }
+      },
+      "active_run_id": {
+        "type": "string"
+      },
+      "source_signature": {
+        "type": "string"
+      },
+      "source_rows": {
+        "type": "bigint"
+      },
+      "first_source_ts": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "last_source_ts": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "latest_source_updated_at": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "processed_at": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "status": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "fleet_name",
+      "pad_name",
+      "name",
+      "stage_num",
+      "algorithm_version"
+    ]
+  }
+}

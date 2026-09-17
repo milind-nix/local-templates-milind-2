@@ -1,8 +1,8 @@
 {
   "key": "merged_anomaly_statistics_stages_v1",
   "displayName": "Merged Anomaly Statistics by Stage",
-  "description": "Active-run stage-level anomaly summary.",
-  "sql": "SELECT * FROM (WITH active_stage AS (\n  SELECT s.*\n  FROM featurestore:merged_anomaly_processing_manifest_v2 m\n  JOIN featurestore:merged_anomaly_stage_summary_v2 s\n    ON s.processing_run_id = m.active_run_id\n   AND s.name = m.name\n   AND s.stage_num_td = m.stage_num_td\n   AND s.algorithm_version = m.algorithm_version\n  WHERE m.status = 'active'\n    AND m.algorithm_version = 'ds-v1'\n    AND m.fleet_name = :fleet_name\n    AND m.pad_name = :pad_name\n    AND (\n      COALESCE(CAST(:well_name AS TEXT), '') IN ('', '__ALL__')\n      OR m.name = CAST(:well_name AS TEXT)\n    )\n)\nSELECT\n  name AS well_name,\n  stage_num_td AS stage_num,\n  stage_start_ts,\n  stage_end_ts,\n  source_rows,\n  total_anomaly_lines,\n  pressure_surge_lines,\n  pump_rate_drop_lines,\n  mid_stage_shutdown_lines,\n  sweep_lines\nFROM active_stage\nORDER BY name, stage_num_td\n) q",
+  "description": "Active-run stage-level anomaly summary. Sapphire-gated (v3 stores, sapphire stage ordinal).",
+  "sql": "SELECT * FROM (WITH active_stage AS (\n  SELECT s.*\n  FROM featurestore:merged_anomaly_processing_manifest_v3 m\n  JOIN featurestore:merged_anomaly_stage_summary_v3 s\n    ON s.processing_run_id = m.active_run_id\n   AND s.name = m.name\n   AND s.stage_num = m.stage_num\n   AND s.algorithm_version = m.algorithm_version\n  WHERE m.status = 'active'\n    AND m.algorithm_version = 'ds-v1'\n    AND m.fleet_name = :fleet_name\n    AND m.pad_name = :pad_name\n    AND (\n      COALESCE(CAST(:well_name AS TEXT), '') IN ('', '__ALL__')\n      OR m.name = CAST(:well_name AS TEXT)\n    )\n)\nSELECT\n  name AS well_name,\n  stage_num AS stage_num,\n  stage_start_ts,\n  stage_end_ts,\n  source_rows,\n  total_anomaly_lines,\n  pressure_surge_lines,\n  pump_rate_drop_lines,\n  mid_stage_shutdown_lines,\n  sweep_lines\nFROM active_stage\nORDER BY name, stage_num\n) q",
   "valueSchema": {
     "type": "object",
     "properties": {

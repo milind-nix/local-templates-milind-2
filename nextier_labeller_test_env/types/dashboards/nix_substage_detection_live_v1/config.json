@@ -1,7 +1,7 @@
 {
   "key": "nix_substage_detection_live_v1",
   "displayName": "Substage Detection Dashboard",
-  "description": "Merged-data v2 substage detection dashboard for Silver Auto, Platinum, and Gold model labels.",
+  "description": "Merged-data v2 substage detection dashboard for Silver Auto, Silver V2, Platinum, and Gold model labels.",
   "order": 3,
   "group": "Substage",
   "config": {
@@ -36,7 +36,7 @@
         },
         "model": {
           "type": "string",
-          "default": "substage_silver_aug27"
+          "default": "sapphire"
         },
         "stage_num": {
           "type": "number",
@@ -171,12 +171,12 @@
                   },
                   "model": {
                     "type": "string",
-                    "default": "substage_silver_aug27",
+                    "default": "sapphire",
                     "enum": [
                       "substage_silver_aug27",
+                      "sapphire",
                       "platinum",
-                      "gold",
-                      "sapphire"
+                      "gold"
                     ],
                     "metadata": {
                       "ui": {
@@ -188,16 +188,16 @@
                             "value": "substage_silver_aug27"
                           },
                           {
+                            "label": "Silver V2",
+                            "value": "sapphire"
+                          },
+                          {
                             "label": "Platinum",
                             "value": "platinum"
                           },
                           {
                             "label": "Gold",
                             "value": "gold"
-                          },
-                          {
-                            "label": "Sapphire",
-                            "value": "sapphire"
                           }
                         ],
                         "onChangeEventId": "model_changed"
@@ -426,6 +426,20 @@
                 "model": "{{form.model}}",
                 "chart_mode": "{{form.chart_mode}}",
                 "concentration_feature": "{{form.concentration_feature}}"
+              }
+            },
+            {
+              "type": "compute_metric",
+              "metricKey": "merged_detection_conc_channel_resolved_v1",
+              "params": {
+                "well_name": "{{form.well_name}}"
+              },
+              "resultKey": "conc_pick"
+            },
+            {
+              "type": "set_form_values",
+              "updates": {
+                "concentration_feature": "{{context.conc_pick.first.concentration_feature}}"
               }
             }
           ],
@@ -9320,6 +9334,887 @@
         }
       },
       {
+        "id": "sapphire_line_chart",
+        "title": "Silver V2 Detection - Line",
+        "description": "Selected-stage merged telemetry with Silver V2 substage labels.",
+        "isDataLarge": true,
+        "chrome": {
+          "showActions": false,
+          "disableCard": false,
+          "padding": {
+            "top": 8,
+            "right": 8,
+            "bottom": 8,
+            "left": 8
+          }
+        },
+        "dataConfig": {
+          "chart_data": {
+            "source": "metric",
+            "metricKey": "merged_detection_sapphire_sept3_timeseries_v1",
+            "fieldName": "ts,rate_slurry,press_mainline,selected_concentration,inferred_pressure,design_rate,design_rate_high,design_rate_rampdown,substage_label,context_anchor",
+            "bindings": {
+              "query": {
+                "well_name": "well_name",
+                "stage_num": "stage_num",
+                "concentration_feature": "concentration_feature",
+                "context_minutes": "context_minutes"
+              },
+              "required": [
+                "well_name",
+                "stage_num",
+                "concentration_feature",
+                "context_minutes"
+              ]
+            }
+          },
+          "stage_windows": {
+            "source": "metric",
+            "metricKey": "merged_detection_sapphire_sept3_windows_v1",
+            "fieldName": "substage_label,start_ts,end_ts,color,sample_count",
+            "bindings": {
+              "query": {
+                "well_name": "well_name",
+                "stage_num": "stage_num",
+                "concentration_feature": "concentration_feature"
+              },
+              "required": [
+                "well_name",
+                "stage_num",
+                "concentration_feature"
+              ]
+            }
+          }
+        },
+        "renderConfig": {
+          "library": "Custom",
+          "options": {
+            "type": "enhanced-echart",
+            "config": {
+              "chartId": "copper_line_chart",
+              "axisRangeControls": {
+                "axes": [
+                  {
+                    "yAxisId": "Y_pressure",
+                    "label": "Pressure",
+                    "persist": true
+                  },
+                  {
+                    "yAxisId": "Y_rate",
+                    "label": "Slurry Rate",
+                    "persist": true
+                  },
+                  {
+                    "yAxisId": "Y_conc",
+                    "label": "Concentration",
+                    "persist": true
+                  }
+                ]
+              },
+              "option": {
+                "grid": {
+                  "top": 92,
+                  "left": 90,
+                  "right": 150,
+                  "bottom": 78,
+                  "containLabel": true
+                },
+                "xAxis": {
+                  "id": "X",
+                  "name": "Time",
+                  "type": "time",
+                  "nameGap": 44,
+                  "nameLocation": "middle",
+                  "axisLabel": {
+                    "rotate": 30,
+                    "hideOverlap": true,
+                    "fontSize": 14,
+                    "formatter": "{HH}:{mm}"
+                  },
+                  "splitLine": {
+                    "show": false
+                  },
+                  "axisLine": {
+                    "lineStyle": {
+                      "color": "rgba(148, 163, 184, 0.45)"
+                    }
+                  },
+                  "nameTextStyle": {
+                    "fontSize": 16
+                  }
+                },
+                "yAxis": [
+                  {
+                    "id": "Y_pressure",
+                    "name": "Pressure (psi)",
+                    "type": "value",
+                    "position": "left",
+                    "nameLocation": "middle",
+                    "nameGap": 58,
+                    "axisLine": {
+                      "show": true,
+                      "lineStyle": {
+                        "color": "#F33F75",
+                        "width": 2
+                      }
+                    },
+                    "axisLabel": {
+                      "color": "#F33F75",
+                      "fontSize": 14
+                    },
+                    "splitLine": {
+                      "show": true,
+                      "lineStyle": {
+                        "color": "rgba(148, 163, 184, 0.14)",
+                        "type": "dashed"
+                      }
+                    },
+                    "nameTextStyle": {
+                      "fontSize": 16
+                    }
+                  },
+                  {
+                    "id": "Y_rate",
+                    "name": "Rate (bpm)",
+                    "type": "value",
+                    "position": "right",
+                    "nameLocation": "middle",
+                    "nameGap": 52,
+                    "axisLine": {
+                      "show": true,
+                      "lineStyle": {
+                        "color": "#4B4ED6",
+                        "width": 2
+                      }
+                    },
+                    "axisLabel": {
+                      "color": "#4B4ED6",
+                      "fontSize": 14
+                    },
+                    "splitLine": {
+                      "show": false
+                    },
+                    "nameTextStyle": {
+                      "fontSize": 16
+                    }
+                  },
+                  {
+                    "id": "Y_conc",
+                    "name": "Concentration (ppa)",
+                    "type": "value",
+                    "position": "right",
+                    "offset": 72,
+                    "nameLocation": "middle",
+                    "nameGap": 62,
+                    "axisLine": {
+                      "show": true,
+                      "lineStyle": {
+                        "color": "#E6982E",
+                        "width": 2
+                      }
+                    },
+                    "axisLabel": {
+                      "color": "#E6982E",
+                      "fontSize": 14
+                    },
+                    "splitLine": {
+                      "show": false
+                    },
+                    "nameTextStyle": {
+                      "fontSize": 16
+                    }
+                  },
+                  {
+                    "type": "value",
+                    "id": "Y_context_extent",
+                    "show": false,
+                    "min": 0,
+                    "max": 1,
+                    "splitLine": {
+                      "show": false
+                    },
+                    "axisLabel": {
+                      "fontSize": 14
+                    }
+                  }
+                ],
+                "tooltip": {
+                  "trigger": "axis",
+                  "axisPointer": {
+                    "type": "cross"
+                  },
+                  "backgroundColor": "rgba(15, 23, 42, 0.92)",
+                  "borderColor": "rgba(148, 163, 184, 0.18)",
+                  "textStyle": {
+                    "color": "#E5E7EB",
+                    "fontSize": 11
+                  }
+                },
+                "dataZoom": [
+                  {
+                    "type": "inside",
+                    "xAxisIndex": 0,
+                    "filterMode": "none"
+                  },
+                  {
+                    "type": "slider",
+                    "xAxisIndex": 0,
+                    "bottom": 16,
+                    "height": 18,
+                    "filterMode": "none",
+                    "showDetail": true,
+                    "brushSelect": false,
+                    "borderColor": "rgba(148, 163, 184, 0.24)",
+                    "backgroundColor": "rgba(148, 163, 184, 0.08)",
+                    "fillerColor": "rgba(20, 184, 166, 0.22)"
+                  },
+                  {
+                    "type": "slider",
+                    "orient": "vertical",
+                    "filterMode": "none",
+                    "showDataShadow": false,
+                    "showDetail": true,
+                    "brushSelect": false,
+                    "width": 10,
+                    "top": 96,
+                    "bottom": 118,
+                    "handleSize": "130%",
+                    "borderColor": "rgba(148, 163, 184, 0.24)",
+                    "backgroundColor": "rgba(148, 163, 184, 0.08)",
+                    "yAxisIndex": 0,
+                    "left": 18,
+                    "fillerColor": "rgba(243, 63, 117, 0.20)",
+                    "handleStyle": {
+                      "color": "#F33F75",
+                      "borderColor": "#F33F75"
+                    }
+                  },
+                  {
+                    "type": "slider",
+                    "orient": "vertical",
+                    "filterMode": "none",
+                    "showDataShadow": false,
+                    "showDetail": true,
+                    "brushSelect": false,
+                    "width": 10,
+                    "top": 96,
+                    "bottom": 118,
+                    "handleSize": "130%",
+                    "borderColor": "rgba(148, 163, 184, 0.24)",
+                    "backgroundColor": "rgba(148, 163, 184, 0.08)",
+                    "yAxisIndex": 1,
+                    "right": 104,
+                    "fillerColor": "rgba(75, 78, 214, 0.20)",
+                    "handleStyle": {
+                      "color": "#4B4ED6",
+                      "borderColor": "#4B4ED6"
+                    }
+                  },
+                  {
+                    "type": "slider",
+                    "orient": "vertical",
+                    "filterMode": "none",
+                    "showDataShadow": false,
+                    "showDetail": true,
+                    "brushSelect": false,
+                    "width": 10,
+                    "top": 96,
+                    "bottom": 118,
+                    "handleSize": "130%",
+                    "borderColor": "rgba(148, 163, 184, 0.24)",
+                    "backgroundColor": "rgba(148, 163, 184, 0.08)",
+                    "yAxisIndex": 2,
+                    "right": 46,
+                    "fillerColor": "rgba(230, 152, 46, 0.22)",
+                    "handleStyle": {
+                      "color": "#E6982E",
+                      "borderColor": "#E6982E"
+                    }
+                  },
+                  {
+                    "type": "inside",
+                    "yAxisIndex": 0,
+                    "filterMode": "none",
+                    "zoomOnMouseWheel": false,
+                    "moveOnMouseWheel": false,
+                    "moveOnMouseMove": false
+                  },
+                  {
+                    "type": "inside",
+                    "yAxisIndex": 1,
+                    "filterMode": "none",
+                    "zoomOnMouseWheel": false,
+                    "moveOnMouseWheel": false,
+                    "moveOnMouseMove": false
+                  },
+                  {
+                    "type": "inside",
+                    "yAxisIndex": 2,
+                    "filterMode": "none",
+                    "zoomOnMouseWheel": false,
+                    "moveOnMouseWheel": false,
+                    "moveOnMouseMove": false
+                  }
+                ],
+                "dataset": [
+                  {
+                    "source": "data:dataset",
+                    "dimensions": [
+                      "chart_data.ts",
+                      "chart_data.press_mainline",
+                      "chart_data.rate_slurry",
+                      "chart_data.selected_concentration",
+                      "chart_data.inferred_pressure",
+                      "chart_data.design_rate",
+                      "chart_data.design_rate_high",
+                      "chart_data.design_rate_rampdown",
+                      "chart_data.substage_label",
+                      "chart_data.context_anchor"
+                    ]
+                  }
+                ],
+                "series": [
+                  {
+                    "name": "Pressure (psi)",
+                    "type": "line",
+                    "large": true,
+                    "encode": {
+                      "x": "chart_data.ts",
+                      "y": "chart_data.press_mainline"
+                    },
+                    "yAxisId": "Y_pressure",
+                    "xAxisId": "X",
+                    "color": "#F33F75",
+                    "datasetIndex": 0,
+                    "smooth": false,
+                    "showSymbol": false,
+                    "sampling": "lttb",
+                    "lineStyle": {
+                      "width": 1.8
+                    }
+                  },
+                  {
+                    "name": "Rate (bpm)",
+                    "type": "line",
+                    "large": true,
+                    "encode": {
+                      "x": "chart_data.ts",
+                      "y": "chart_data.rate_slurry"
+                    },
+                    "yAxisId": "Y_rate",
+                    "xAxisId": "X",
+                    "color": "#4B4ED6",
+                    "datasetIndex": 0,
+                    "smooth": false,
+                    "showSymbol": false,
+                    "sampling": "lttb",
+                    "lineStyle": {
+                      "width": 1.8
+                    }
+                  },
+                  {
+                    "name": "Concentration (ppa)",
+                    "type": "line",
+                    "large": true,
+                    "encode": {
+                      "x": "chart_data.ts",
+                      "y": "chart_data.selected_concentration"
+                    },
+                    "yAxisId": "Y_conc",
+                    "xAxisId": "X",
+                    "color": "#E6982E",
+                    "datasetIndex": 0,
+                    "smooth": false,
+                    "showSymbol": false,
+                    "sampling": "lttb",
+                    "lineStyle": {
+                      "width": 1.8
+                    }
+                  },
+                  {
+                    "name": "Open Well",
+                    "type": "line",
+                    "data": [],
+                    "xAxisId": "X",
+                    "yAxisId": "Y_pressure",
+                    "symbol": "none",
+                    "lineStyle": {
+                      "opacity": 0
+                    },
+                    "color": "#2563EB",
+                    "itemStyle": {
+                      "color": "#2563EB"
+                    },
+                    "tooltip": {
+                      "show": false
+                    },
+                    "emphasis": {
+                      "disabled": true
+                    },
+                    "markLine": {
+                      "symbol": [
+                        "none",
+                        "none"
+                      ],
+                      "silent": true,
+                      "label": {
+                        "show": false
+                      },
+                      "lineStyle": {
+                        "type": "dotted",
+                        "width": 2
+                      },
+                      "data": "function:windowMarkLineV2(data=data:stage_windows, label=open_well, labelField=substage_label, startField=start_ts, colorField=color, endField=end_ts, pointOnly=true)"
+                    },
+                    "markArea": {
+                      "silent": true,
+                      "data": "function:windowMarkAreaV2(data=data:stage_windows, label=open_well, labelField=substage_label, startField=start_ts, colorField=color, endField=end_ts, minWindowDurationSec=0, minLabelDurationSec=0, opacity=0.12, snapGaps=false)",
+                      "label": {
+                        "show": true,
+                        "position": "inside",
+                        "rotate": 90,
+                        "color": "rgba(226, 232, 240, 0.86)",
+                        "fontSize": 11,
+                        "fontWeight": 600,
+                        "overflow": "truncate"
+                      }
+                    }
+                  },
+                  {
+                    "name": "Stage Start",
+                    "type": "line",
+                    "data": [],
+                    "xAxisId": "X",
+                    "yAxisId": "Y_pressure",
+                    "symbol": "none",
+                    "lineStyle": {
+                      "opacity": 0
+                    },
+                    "color": "#16A34A",
+                    "itemStyle": {
+                      "color": "#16A34A"
+                    },
+                    "tooltip": {
+                      "show": false
+                    },
+                    "emphasis": {
+                      "disabled": true
+                    },
+                    "markLine": {
+                      "symbol": [
+                        "none",
+                        "none"
+                      ],
+                      "silent": true,
+                      "label": {
+                        "show": false
+                      },
+                      "lineStyle": {
+                        "type": "dotted",
+                        "width": 2
+                      },
+                      "data": "function:windowMarkLineV2(data=data:stage_windows, label=stage_start, labelField=substage_label, startField=start_ts, colorField=color, endField=end_ts, pointOnly=true)"
+                    },
+                    "markArea": {
+                      "silent": true,
+                      "data": "function:windowMarkAreaV2(data=data:stage_windows, label=stage_start, labelField=substage_label, startField=start_ts, colorField=color, endField=end_ts, minWindowDurationSec=0, minLabelDurationSec=0, opacity=0.12, snapGaps=false)",
+                      "label": {
+                        "show": true,
+                        "position": "inside",
+                        "rotate": 90,
+                        "color": "rgba(226, 232, 240, 0.86)",
+                        "fontSize": 11,
+                        "fontWeight": 600,
+                        "overflow": "truncate"
+                      }
+                    }
+                  },
+                  {
+                    "name": "TTR",
+                    "type": "line",
+                    "data": [],
+                    "xAxisId": "X",
+                    "yAxisId": "Y_pressure",
+                    "symbol": "none",
+                    "lineStyle": {
+                      "opacity": 0
+                    },
+                    "color": "#9333EA",
+                    "itemStyle": {
+                      "color": "#9333EA"
+                    },
+                    "tooltip": {
+                      "show": false
+                    },
+                    "emphasis": {
+                      "disabled": true
+                    },
+                    "markLine": {
+                      "symbol": [
+                        "none",
+                        "none"
+                      ],
+                      "silent": true,
+                      "label": {
+                        "show": false
+                      },
+                      "lineStyle": {
+                        "type": "dotted",
+                        "width": 2
+                      },
+                      "data": "function:windowMarkLineV2(data=data:stage_windows, label=ttr, labelField=substage_label, startField=start_ts, colorField=color, endField=end_ts, pointOnly=true)"
+                    },
+                    "markArea": {
+                      "silent": true,
+                      "data": "function:windowMarkAreaV2(data=data:stage_windows, label=ttr, labelField=substage_label, startField=start_ts, colorField=color, endField=end_ts, minWindowDurationSec=0, minLabelDurationSec=0, opacity=0.12, snapGaps=false)",
+                      "label": {
+                        "show": true,
+                        "position": "inside",
+                        "rotate": 90,
+                        "color": "rgba(226, 232, 240, 0.86)",
+                        "fontSize": 11,
+                        "fontWeight": 600,
+                        "overflow": "truncate"
+                      }
+                    }
+                  },
+                  {
+                    "name": "Pad",
+                    "type": "line",
+                    "data": [],
+                    "xAxisId": "X",
+                    "yAxisId": "Y_pressure",
+                    "symbol": "none",
+                    "lineStyle": {
+                      "opacity": 0
+                    },
+                    "color": "#F97316",
+                    "itemStyle": {
+                      "color": "#F97316"
+                    },
+                    "tooltip": {
+                      "show": false
+                    },
+                    "emphasis": {
+                      "disabled": true
+                    },
+                    "markLine": {
+                      "symbol": [
+                        "none",
+                        "none"
+                      ],
+                      "silent": true,
+                      "label": {
+                        "show": false
+                      },
+                      "lineStyle": {
+                        "type": "dotted",
+                        "width": 2
+                      },
+                      "data": "function:windowMarkLineV2(data=data:stage_windows, label=pad, labelField=substage_label, startField=start_ts, colorField=color, endField=end_ts, pointOnly=true)"
+                    },
+                    "markArea": {
+                      "silent": true,
+                      "data": "function:windowMarkAreaV2(data=data:stage_windows, label=pad, labelField=substage_label, startField=start_ts, colorField=color, endField=end_ts, minWindowDurationSec=0, minLabelDurationSec=0, opacity=0.12, snapGaps=true)",
+                      "label": {
+                        "show": true,
+                        "position": "inside",
+                        "rotate": 90,
+                        "color": "rgba(226, 232, 240, 0.86)",
+                        "fontSize": 11,
+                        "fontWeight": 600,
+                        "overflow": "truncate"
+                      }
+                    }
+                  },
+                  {
+                    "name": "Slurry",
+                    "type": "line",
+                    "data": [],
+                    "xAxisId": "X",
+                    "yAxisId": "Y_pressure",
+                    "symbol": "none",
+                    "lineStyle": {
+                      "opacity": 0
+                    },
+                    "color": "#DC2626",
+                    "itemStyle": {
+                      "color": "#DC2626"
+                    },
+                    "tooltip": {
+                      "show": false
+                    },
+                    "emphasis": {
+                      "disabled": true
+                    },
+                    "markLine": {
+                      "symbol": [
+                        "none",
+                        "none"
+                      ],
+                      "silent": true,
+                      "label": {
+                        "show": false
+                      },
+                      "lineStyle": {
+                        "type": "dotted",
+                        "width": 2
+                      },
+                      "data": "function:windowMarkLineV2(data=data:stage_windows, label=slurry, labelField=substage_label, startField=start_ts, colorField=color, endField=end_ts, pointOnly=true)"
+                    },
+                    "markArea": {
+                      "silent": true,
+                      "data": "function:windowMarkAreaV2(data=data:stage_windows, label=slurry, labelField=substage_label, startField=start_ts, colorField=color, endField=end_ts, minWindowDurationSec=0, minLabelDurationSec=0, opacity=0.12, snapGaps=true)",
+                      "label": {
+                        "show": true,
+                        "position": "inside",
+                        "rotate": 90,
+                        "color": "rgba(226, 232, 240, 0.86)",
+                        "fontSize": 11,
+                        "fontWeight": 600,
+                        "overflow": "truncate"
+                      }
+                    }
+                  },
+                  {
+                    "name": "Flush",
+                    "type": "line",
+                    "data": [],
+                    "xAxisId": "X",
+                    "yAxisId": "Y_pressure",
+                    "symbol": "none",
+                    "lineStyle": {
+                      "opacity": 0
+                    },
+                    "color": "#0D9488",
+                    "itemStyle": {
+                      "color": "#0D9488"
+                    },
+                    "tooltip": {
+                      "show": false
+                    },
+                    "emphasis": {
+                      "disabled": true
+                    },
+                    "markLine": {
+                      "symbol": [
+                        "none",
+                        "none"
+                      ],
+                      "silent": true,
+                      "label": {
+                        "show": false
+                      },
+                      "lineStyle": {
+                        "type": "dotted",
+                        "width": 2
+                      },
+                      "data": "function:windowMarkLineV2(data=data:stage_windows, label=flush, labelField=substage_label, startField=start_ts, colorField=color, endField=end_ts, pointOnly=true)"
+                    },
+                    "markArea": {
+                      "silent": true,
+                      "data": "function:windowMarkAreaV2(data=data:stage_windows, label=flush, labelField=substage_label, startField=start_ts, colorField=color, endField=end_ts, minWindowDurationSec=0, minLabelDurationSec=0, opacity=0.12, snapGaps=true)",
+                      "label": {
+                        "show": true,
+                        "position": "inside",
+                        "rotate": 90,
+                        "color": "rgba(226, 232, 240, 0.86)",
+                        "fontSize": 11,
+                        "fontWeight": 600,
+                        "overflow": "truncate"
+                      }
+                    }
+                  },
+                  {
+                    "name": "Stage End",
+                    "type": "line",
+                    "data": [],
+                    "xAxisId": "X",
+                    "yAxisId": "Y_pressure",
+                    "symbol": "none",
+                    "lineStyle": {
+                      "opacity": 0
+                    },
+                    "color": "#DB2777",
+                    "itemStyle": {
+                      "color": "#DB2777"
+                    },
+                    "tooltip": {
+                      "show": false
+                    },
+                    "emphasis": {
+                      "disabled": true
+                    },
+                    "markLine": {
+                      "symbol": [
+                        "none",
+                        "none"
+                      ],
+                      "silent": true,
+                      "label": {
+                        "show": false
+                      },
+                      "lineStyle": {
+                        "type": "dotted",
+                        "width": 2
+                      },
+                      "data": "function:windowMarkLineV2(data=data:stage_windows, label=stage_end, labelField=substage_label, startField=start_ts, colorField=color, endField=end_ts, pointOnly=true)"
+                    },
+                    "markArea": {
+                      "silent": true,
+                      "data": "function:windowMarkAreaV2(data=data:stage_windows, label=stage_end, labelField=substage_label, startField=start_ts, colorField=color, endField=end_ts, minWindowDurationSec=0, minLabelDurationSec=0, opacity=0.12, snapGaps=false)",
+                      "label": {
+                        "show": true,
+                        "position": "inside",
+                        "rotate": 90,
+                        "color": "rgba(226, 232, 240, 0.86)",
+                        "fontSize": 11,
+                        "fontWeight": 600,
+                        "overflow": "truncate"
+                      }
+                    }
+                  },
+                  {
+                    "name": "Close Well",
+                    "type": "line",
+                    "data": [],
+                    "xAxisId": "X",
+                    "yAxisId": "Y_pressure",
+                    "symbol": "none",
+                    "lineStyle": {
+                      "opacity": 0
+                    },
+                    "color": "#EAB308",
+                    "itemStyle": {
+                      "color": "#EAB308"
+                    },
+                    "tooltip": {
+                      "show": false
+                    },
+                    "emphasis": {
+                      "disabled": true
+                    },
+                    "markLine": {
+                      "symbol": [
+                        "none",
+                        "none"
+                      ],
+                      "silent": true,
+                      "label": {
+                        "show": false
+                      },
+                      "lineStyle": {
+                        "type": "dotted",
+                        "width": 2
+                      },
+                      "data": "function:windowMarkLineV2(data=data:stage_windows, label=close_well, labelField=substage_label, startField=start_ts, colorField=color, endField=end_ts, pointOnly=true)"
+                    },
+                    "markArea": {
+                      "silent": true,
+                      "data": "function:windowMarkAreaV2(data=data:stage_windows, label=close_well, labelField=substage_label, startField=start_ts, colorField=color, endField=end_ts, minWindowDurationSec=0, minLabelDurationSec=0, opacity=0.12, snapGaps=false)",
+                      "label": {
+                        "show": true,
+                        "position": "inside",
+                        "rotate": 90,
+                        "color": "rgba(226, 232, 240, 0.86)",
+                        "fontSize": 11,
+                        "fontWeight": 600,
+                        "overflow": "truncate"
+                      }
+                    }
+                  },
+                  {
+                    "type": "scatter",
+                    "encode": {
+                      "x": "chart_data.ts",
+                      "y": "chart_data.context_anchor"
+                    },
+                    "xAxisId": "X",
+                    "yAxisId": "Y_context_extent",
+                    "datasetIndex": 0,
+                    "symbolSize": 0,
+                    "silent": true,
+                    "tooltip": {
+                      "show": false
+                    },
+                    "itemStyle": {
+                      "opacity": 0
+                    },
+                    "emphasis": {
+                      "disabled": true
+                    },
+                    "legendHoverLink": false
+                  }
+                ],
+                "legend": [
+                  {
+                    "top": 8,
+                    "type": "scroll",
+                    "textStyle": {
+                      "fontSize": 14
+                    },
+                    "left": "center",
+                    "data": [
+                      "Pressure (psi)",
+                      "Rate (bpm)",
+                      "Concentration (ppa)"
+                    ]
+                  },
+                  {
+                    "top": 34,
+                    "type": "scroll",
+                    "textStyle": {
+                      "fontSize": 14
+                    },
+                    "left": "center",
+                    "data": [
+                      "Open Well",
+                      "Stage Start",
+                      "Pad",
+                      "TTR",
+                      "Slurry",
+                      "Flush",
+                      "Stage End",
+                      "Close Well"
+                    ]
+                  }
+                ],
+                "toolbox": {
+                  "show": true,
+                  "top": 44,
+                  "right": 16,
+                  "itemSize": 16,
+                  "itemGap": 10,
+                  "iconStyle": {
+                    "borderColor": "rgba(148, 163, 184, 0.95)"
+                  },
+                  "emphasis": {
+                    "iconStyle": {
+                      "borderColor": "#14B8A6"
+                    }
+                  },
+                  "feature": {
+                    "dataZoom": {
+                      "title": {
+                        "zoom": "Box Zoom",
+                        "back": "Zoom Back"
+                      },
+                      "xAxisIndex": [
+                        0
+                      ],
+                      "yAxisIndex": false
+                    },
+                    "restore": {
+                      "title": "Reset Zoom"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      {
         "id": "substage_silver_aug27_scatter_chart",
         "title": "Silver (Beta) Detection - Scatter",
         "description": "Selected-stage merged telemetry with Silver Beta substage labels.",
@@ -10198,9 +11093,9 @@
         }
       },
       {
-        "id": "substage_sapphire_line_chart",
-        "title": "Sapphire (Beta) Detection - Line",
-        "description": "Sapphire substage labels over the substage-refined titanium window.",
+        "id": "sapphire_scatter_chart",
+        "title": "Silver V2 Detection - Scatter",
+        "description": "Selected-stage merged telemetry points coloured by Silver V2 substage label.",
         "isDataLarge": true,
         "chrome": {
           "showActions": false,
@@ -10215,7 +11110,7 @@
         "dataConfig": {
           "chart_data": {
             "source": "metric",
-            "metricKey": "merged_detection_substage_sapphire_timeseries_v1",
+            "metricKey": "merged_detection_sapphire_sept3_timeseries_v1",
             "fieldName": "ts,rate_slurry,press_mainline,selected_concentration,inferred_pressure,design_rate,design_rate_high,design_rate_rampdown,substage_label,context_anchor",
             "bindings": {
               "query": {
@@ -10234,888 +11129,7 @@
           },
           "stage_windows": {
             "source": "metric",
-            "metricKey": "merged_detection_substage_sapphire_windows_v1",
-            "fieldName": "substage_label,start_ts,end_ts,color,sample_count",
-            "bindings": {
-              "query": {
-                "well_name": "well_name",
-                "stage_num": "stage_num",
-                "concentration_feature": "concentration_feature"
-              },
-              "required": [
-                "well_name",
-                "stage_num",
-                "concentration_feature"
-              ]
-            }
-          }
-        },
-        "renderConfig": {
-          "library": "Custom",
-          "options": {
-            "type": "enhanced-echart",
-            "config": {
-              "chartId": "copper_line_chart",
-              "axisRangeControls": {
-                "axes": [
-                  {
-                    "yAxisId": "Y_pressure",
-                    "label": "Pressure",
-                    "persist": true
-                  },
-                  {
-                    "yAxisId": "Y_rate",
-                    "label": "Slurry Rate",
-                    "persist": true
-                  },
-                  {
-                    "yAxisId": "Y_conc",
-                    "label": "Concentration",
-                    "persist": true
-                  }
-                ]
-              },
-              "option": {
-                "grid": {
-                  "top": 92,
-                  "left": 90,
-                  "right": 150,
-                  "bottom": 78,
-                  "containLabel": true
-                },
-                "xAxis": {
-                  "id": "X",
-                  "name": "Time",
-                  "type": "time",
-                  "nameGap": 44,
-                  "nameLocation": "middle",
-                  "axisLabel": {
-                    "rotate": 30,
-                    "hideOverlap": true,
-                    "fontSize": 14,
-                    "formatter": "{HH}:{mm}"
-                  },
-                  "splitLine": {
-                    "show": false
-                  },
-                  "axisLine": {
-                    "lineStyle": {
-                      "color": "rgba(148, 163, 184, 0.45)"
-                    }
-                  },
-                  "nameTextStyle": {
-                    "fontSize": 16
-                  }
-                },
-                "yAxis": [
-                  {
-                    "id": "Y_pressure",
-                    "name": "Pressure (psi)",
-                    "type": "value",
-                    "position": "left",
-                    "nameLocation": "middle",
-                    "nameGap": 58,
-                    "axisLine": {
-                      "show": true,
-                      "lineStyle": {
-                        "color": "#F33F75",
-                        "width": 2
-                      }
-                    },
-                    "axisLabel": {
-                      "color": "#F33F75",
-                      "fontSize": 14
-                    },
-                    "splitLine": {
-                      "show": true,
-                      "lineStyle": {
-                        "color": "rgba(148, 163, 184, 0.14)",
-                        "type": "dashed"
-                      }
-                    },
-                    "nameTextStyle": {
-                      "fontSize": 16
-                    }
-                  },
-                  {
-                    "id": "Y_rate",
-                    "name": "Rate (bpm)",
-                    "type": "value",
-                    "position": "right",
-                    "nameLocation": "middle",
-                    "nameGap": 52,
-                    "axisLine": {
-                      "show": true,
-                      "lineStyle": {
-                        "color": "#4B4ED6",
-                        "width": 2
-                      }
-                    },
-                    "axisLabel": {
-                      "color": "#4B4ED6",
-                      "fontSize": 14
-                    },
-                    "splitLine": {
-                      "show": false
-                    },
-                    "nameTextStyle": {
-                      "fontSize": 16
-                    }
-                  },
-                  {
-                    "id": "Y_conc",
-                    "name": "Concentration (ppa)",
-                    "type": "value",
-                    "position": "right",
-                    "offset": 72,
-                    "nameLocation": "middle",
-                    "nameGap": 62,
-                    "axisLine": {
-                      "show": true,
-                      "lineStyle": {
-                        "color": "#E6982E",
-                        "width": 2
-                      }
-                    },
-                    "axisLabel": {
-                      "color": "#E6982E",
-                      "fontSize": 14
-                    },
-                    "splitLine": {
-                      "show": false
-                    },
-                    "nameTextStyle": {
-                      "fontSize": 16
-                    }
-                  },
-                  {
-                    "type": "value",
-                    "id": "Y_context_extent",
-                    "show": false,
-                    "min": 0,
-                    "max": 1,
-                    "splitLine": {
-                      "show": false
-                    },
-                    "axisLabel": {
-                      "fontSize": 14
-                    }
-                  }
-                ],
-                "tooltip": {
-                  "trigger": "axis",
-                  "axisPointer": {
-                    "type": "cross"
-                  },
-                  "backgroundColor": "rgba(15, 23, 42, 0.92)",
-                  "borderColor": "rgba(148, 163, 184, 0.18)",
-                  "textStyle": {
-                    "color": "#E5E7EB",
-                    "fontSize": 11
-                  }
-                },
-                "dataZoom": [
-                  {
-                    "type": "inside",
-                    "xAxisIndex": 0,
-                    "filterMode": "none"
-                  },
-                  {
-                    "type": "slider",
-                    "xAxisIndex": 0,
-                    "bottom": 16,
-                    "height": 18,
-                    "filterMode": "none",
-                    "showDetail": true,
-                    "brushSelect": false,
-                    "borderColor": "rgba(148, 163, 184, 0.24)",
-                    "backgroundColor": "rgba(148, 163, 184, 0.08)",
-                    "fillerColor": "rgba(20, 184, 166, 0.22)"
-                  },
-                  {
-                    "type": "slider",
-                    "orient": "vertical",
-                    "filterMode": "none",
-                    "showDataShadow": false,
-                    "showDetail": true,
-                    "brushSelect": false,
-                    "width": 10,
-                    "top": 96,
-                    "bottom": 118,
-                    "handleSize": "130%",
-                    "borderColor": "rgba(148, 163, 184, 0.24)",
-                    "backgroundColor": "rgba(148, 163, 184, 0.08)",
-                    "yAxisIndex": 0,
-                    "left": 18,
-                    "fillerColor": "rgba(243, 63, 117, 0.20)",
-                    "handleStyle": {
-                      "color": "#F33F75",
-                      "borderColor": "#F33F75"
-                    }
-                  },
-                  {
-                    "type": "slider",
-                    "orient": "vertical",
-                    "filterMode": "none",
-                    "showDataShadow": false,
-                    "showDetail": true,
-                    "brushSelect": false,
-                    "width": 10,
-                    "top": 96,
-                    "bottom": 118,
-                    "handleSize": "130%",
-                    "borderColor": "rgba(148, 163, 184, 0.24)",
-                    "backgroundColor": "rgba(148, 163, 184, 0.08)",
-                    "yAxisIndex": 1,
-                    "right": 104,
-                    "fillerColor": "rgba(75, 78, 214, 0.20)",
-                    "handleStyle": {
-                      "color": "#4B4ED6",
-                      "borderColor": "#4B4ED6"
-                    }
-                  },
-                  {
-                    "type": "slider",
-                    "orient": "vertical",
-                    "filterMode": "none",
-                    "showDataShadow": false,
-                    "showDetail": true,
-                    "brushSelect": false,
-                    "width": 10,
-                    "top": 96,
-                    "bottom": 118,
-                    "handleSize": "130%",
-                    "borderColor": "rgba(148, 163, 184, 0.24)",
-                    "backgroundColor": "rgba(148, 163, 184, 0.08)",
-                    "yAxisIndex": 2,
-                    "right": 46,
-                    "fillerColor": "rgba(230, 152, 46, 0.22)",
-                    "handleStyle": {
-                      "color": "#E6982E",
-                      "borderColor": "#E6982E"
-                    }
-                  },
-                  {
-                    "type": "inside",
-                    "yAxisIndex": 0,
-                    "filterMode": "none",
-                    "zoomOnMouseWheel": false,
-                    "moveOnMouseWheel": false,
-                    "moveOnMouseMove": false
-                  },
-                  {
-                    "type": "inside",
-                    "yAxisIndex": 1,
-                    "filterMode": "none",
-                    "zoomOnMouseWheel": false,
-                    "moveOnMouseWheel": false,
-                    "moveOnMouseMove": false
-                  },
-                  {
-                    "type": "inside",
-                    "yAxisIndex": 2,
-                    "filterMode": "none",
-                    "zoomOnMouseWheel": false,
-                    "moveOnMouseWheel": false,
-                    "moveOnMouseMove": false
-                  }
-                ],
-                "dataset": [
-                  {
-                    "source": "data:dataset",
-                    "dimensions": [
-                      "chart_data.ts",
-                      "chart_data.press_mainline",
-                      "chart_data.rate_slurry",
-                      "chart_data.selected_concentration",
-                      "chart_data.inferred_pressure",
-                      "chart_data.design_rate",
-                      "chart_data.design_rate_high",
-                      "chart_data.design_rate_rampdown",
-                      "chart_data.substage_label",
-                      "chart_data.context_anchor"
-                    ]
-                  }
-                ],
-                "series": [
-                  {
-                    "name": "Pressure (psi)",
-                    "type": "line",
-                    "large": true,
-                    "encode": {
-                      "x": "chart_data.ts",
-                      "y": "chart_data.press_mainline"
-                    },
-                    "yAxisId": "Y_pressure",
-                    "xAxisId": "X",
-                    "color": "#F33F75",
-                    "datasetIndex": 0,
-                    "smooth": false,
-                    "showSymbol": false,
-                    "sampling": "lttb",
-                    "lineStyle": {
-                      "width": 1.8
-                    }
-                  },
-                  {
-                    "name": "Rate (bpm)",
-                    "type": "line",
-                    "large": true,
-                    "encode": {
-                      "x": "chart_data.ts",
-                      "y": "chart_data.rate_slurry"
-                    },
-                    "yAxisId": "Y_rate",
-                    "xAxisId": "X",
-                    "color": "#4B4ED6",
-                    "datasetIndex": 0,
-                    "smooth": false,
-                    "showSymbol": false,
-                    "sampling": "lttb",
-                    "lineStyle": {
-                      "width": 1.8
-                    }
-                  },
-                  {
-                    "name": "Concentration (ppa)",
-                    "type": "line",
-                    "large": true,
-                    "encode": {
-                      "x": "chart_data.ts",
-                      "y": "chart_data.selected_concentration"
-                    },
-                    "yAxisId": "Y_conc",
-                    "xAxisId": "X",
-                    "color": "#E6982E",
-                    "datasetIndex": 0,
-                    "smooth": false,
-                    "showSymbol": false,
-                    "sampling": "lttb",
-                    "lineStyle": {
-                      "width": 1.8
-                    }
-                  },
-                  {
-                    "name": "Open Well",
-                    "type": "line",
-                    "data": [],
-                    "xAxisId": "X",
-                    "yAxisId": "Y_pressure",
-                    "symbol": "none",
-                    "lineStyle": {
-                      "opacity": 0
-                    },
-                    "color": "#2563EB",
-                    "itemStyle": {
-                      "color": "#2563EB"
-                    },
-                    "tooltip": {
-                      "show": false
-                    },
-                    "emphasis": {
-                      "disabled": true
-                    },
-                    "markLine": {
-                      "symbol": [
-                        "none",
-                        "none"
-                      ],
-                      "silent": true,
-                      "label": {
-                        "show": false
-                      },
-                      "lineStyle": {
-                        "type": "dotted",
-                        "width": 2
-                      },
-                      "data": "function:windowMarkLineV2(data=data:stage_windows, label=open_well, labelField=substage_label, startField=start_ts, colorField=color, endField=end_ts, pointOnly=true)"
-                    },
-                    "markArea": {
-                      "silent": true,
-                      "data": "function:windowMarkAreaV2(data=data:stage_windows, label=open_well, labelField=substage_label, startField=start_ts, colorField=color, endField=end_ts, minWindowDurationSec=0, minLabelDurationSec=0, opacity=0.12, snapGaps=false)",
-                      "label": {
-                        "show": true,
-                        "position": "inside",
-                        "rotate": 90,
-                        "color": "rgba(226, 232, 240, 0.86)",
-                        "fontSize": 11,
-                        "fontWeight": 600,
-                        "overflow": "truncate"
-                      }
-                    }
-                  },
-                  {
-                    "name": "Stage Start",
-                    "type": "line",
-                    "data": [],
-                    "xAxisId": "X",
-                    "yAxisId": "Y_pressure",
-                    "symbol": "none",
-                    "lineStyle": {
-                      "opacity": 0
-                    },
-                    "color": "#16A34A",
-                    "itemStyle": {
-                      "color": "#16A34A"
-                    },
-                    "tooltip": {
-                      "show": false
-                    },
-                    "emphasis": {
-                      "disabled": true
-                    },
-                    "markLine": {
-                      "symbol": [
-                        "none",
-                        "none"
-                      ],
-                      "silent": true,
-                      "label": {
-                        "show": false
-                      },
-                      "lineStyle": {
-                        "type": "dotted",
-                        "width": 2
-                      },
-                      "data": "function:windowMarkLineV2(data=data:stage_windows, label=stage_start, labelField=substage_label, startField=start_ts, colorField=color, endField=end_ts, pointOnly=true)"
-                    },
-                    "markArea": {
-                      "silent": true,
-                      "data": "function:windowMarkAreaV2(data=data:stage_windows, label=stage_start, labelField=substage_label, startField=start_ts, colorField=color, endField=end_ts, minWindowDurationSec=0, minLabelDurationSec=0, opacity=0.12, snapGaps=false)",
-                      "label": {
-                        "show": true,
-                        "position": "inside",
-                        "rotate": 90,
-                        "color": "rgba(226, 232, 240, 0.86)",
-                        "fontSize": 11,
-                        "fontWeight": 600,
-                        "overflow": "truncate"
-                      }
-                    }
-                  },
-                  {
-                    "name": "TTR",
-                    "type": "line",
-                    "data": [],
-                    "xAxisId": "X",
-                    "yAxisId": "Y_pressure",
-                    "symbol": "none",
-                    "lineStyle": {
-                      "opacity": 0
-                    },
-                    "color": "#9333EA",
-                    "itemStyle": {
-                      "color": "#9333EA"
-                    },
-                    "tooltip": {
-                      "show": false
-                    },
-                    "emphasis": {
-                      "disabled": true
-                    },
-                    "markLine": {
-                      "symbol": [
-                        "none",
-                        "none"
-                      ],
-                      "silent": true,
-                      "label": {
-                        "show": false
-                      },
-                      "lineStyle": {
-                        "type": "dotted",
-                        "width": 2
-                      },
-                      "data": "function:windowMarkLineV2(data=data:stage_windows, label=ttr, labelField=substage_label, startField=start_ts, colorField=color, endField=end_ts, pointOnly=true)"
-                    },
-                    "markArea": {
-                      "silent": true,
-                      "data": "function:windowMarkAreaV2(data=data:stage_windows, label=ttr, labelField=substage_label, startField=start_ts, colorField=color, endField=end_ts, minWindowDurationSec=0, minLabelDurationSec=0, opacity=0.12, snapGaps=false)",
-                      "label": {
-                        "show": true,
-                        "position": "inside",
-                        "rotate": 90,
-                        "color": "rgba(226, 232, 240, 0.86)",
-                        "fontSize": 11,
-                        "fontWeight": 600,
-                        "overflow": "truncate"
-                      }
-                    }
-                  },
-                  {
-                    "name": "Pad",
-                    "type": "line",
-                    "data": [],
-                    "xAxisId": "X",
-                    "yAxisId": "Y_pressure",
-                    "symbol": "none",
-                    "lineStyle": {
-                      "opacity": 0
-                    },
-                    "color": "#F97316",
-                    "itemStyle": {
-                      "color": "#F97316"
-                    },
-                    "tooltip": {
-                      "show": false
-                    },
-                    "emphasis": {
-                      "disabled": true
-                    },
-                    "markLine": {
-                      "symbol": [
-                        "none",
-                        "none"
-                      ],
-                      "silent": true,
-                      "label": {
-                        "show": false
-                      },
-                      "lineStyle": {
-                        "type": "dotted",
-                        "width": 2
-                      },
-                      "data": "function:windowMarkLineV2(data=data:stage_windows, label=pad, labelField=substage_label, startField=start_ts, colorField=color, endField=end_ts, pointOnly=true)"
-                    },
-                    "markArea": {
-                      "silent": true,
-                      "data": "function:windowMarkAreaV2(data=data:stage_windows, label=pad, labelField=substage_label, startField=start_ts, colorField=color, endField=end_ts, minWindowDurationSec=0, minLabelDurationSec=0, opacity=0.12, snapGaps=true)",
-                      "label": {
-                        "show": true,
-                        "position": "inside",
-                        "rotate": 90,
-                        "color": "rgba(226, 232, 240, 0.86)",
-                        "fontSize": 11,
-                        "fontWeight": 600,
-                        "overflow": "truncate"
-                      }
-                    }
-                  },
-                  {
-                    "name": "Slurry",
-                    "type": "line",
-                    "data": [],
-                    "xAxisId": "X",
-                    "yAxisId": "Y_pressure",
-                    "symbol": "none",
-                    "lineStyle": {
-                      "opacity": 0
-                    },
-                    "color": "#DC2626",
-                    "itemStyle": {
-                      "color": "#DC2626"
-                    },
-                    "tooltip": {
-                      "show": false
-                    },
-                    "emphasis": {
-                      "disabled": true
-                    },
-                    "markLine": {
-                      "symbol": [
-                        "none",
-                        "none"
-                      ],
-                      "silent": true,
-                      "label": {
-                        "show": false
-                      },
-                      "lineStyle": {
-                        "type": "dotted",
-                        "width": 2
-                      },
-                      "data": "function:windowMarkLineV2(data=data:stage_windows, label=slurry, labelField=substage_label, startField=start_ts, colorField=color, endField=end_ts, pointOnly=true)"
-                    },
-                    "markArea": {
-                      "silent": true,
-                      "data": "function:windowMarkAreaV2(data=data:stage_windows, label=slurry, labelField=substage_label, startField=start_ts, colorField=color, endField=end_ts, minWindowDurationSec=0, minLabelDurationSec=0, opacity=0.12, snapGaps=true)",
-                      "label": {
-                        "show": true,
-                        "position": "inside",
-                        "rotate": 90,
-                        "color": "rgba(226, 232, 240, 0.86)",
-                        "fontSize": 11,
-                        "fontWeight": 600,
-                        "overflow": "truncate"
-                      }
-                    }
-                  },
-                  {
-                    "name": "Flush",
-                    "type": "line",
-                    "data": [],
-                    "xAxisId": "X",
-                    "yAxisId": "Y_pressure",
-                    "symbol": "none",
-                    "lineStyle": {
-                      "opacity": 0
-                    },
-                    "color": "#0D9488",
-                    "itemStyle": {
-                      "color": "#0D9488"
-                    },
-                    "tooltip": {
-                      "show": false
-                    },
-                    "emphasis": {
-                      "disabled": true
-                    },
-                    "markLine": {
-                      "symbol": [
-                        "none",
-                        "none"
-                      ],
-                      "silent": true,
-                      "label": {
-                        "show": false
-                      },
-                      "lineStyle": {
-                        "type": "dotted",
-                        "width": 2
-                      },
-                      "data": "function:windowMarkLineV2(data=data:stage_windows, label=flush, labelField=substage_label, startField=start_ts, colorField=color, endField=end_ts, pointOnly=true)"
-                    },
-                    "markArea": {
-                      "silent": true,
-                      "data": "function:windowMarkAreaV2(data=data:stage_windows, label=flush, labelField=substage_label, startField=start_ts, colorField=color, endField=end_ts, minWindowDurationSec=0, minLabelDurationSec=0, opacity=0.12, snapGaps=true)",
-                      "label": {
-                        "show": true,
-                        "position": "inside",
-                        "rotate": 90,
-                        "color": "rgba(226, 232, 240, 0.86)",
-                        "fontSize": 11,
-                        "fontWeight": 600,
-                        "overflow": "truncate"
-                      }
-                    }
-                  },
-                  {
-                    "name": "Stage End",
-                    "type": "line",
-                    "data": [],
-                    "xAxisId": "X",
-                    "yAxisId": "Y_pressure",
-                    "symbol": "none",
-                    "lineStyle": {
-                      "opacity": 0
-                    },
-                    "color": "#DB2777",
-                    "itemStyle": {
-                      "color": "#DB2777"
-                    },
-                    "tooltip": {
-                      "show": false
-                    },
-                    "emphasis": {
-                      "disabled": true
-                    },
-                    "markLine": {
-                      "symbol": [
-                        "none",
-                        "none"
-                      ],
-                      "silent": true,
-                      "label": {
-                        "show": false
-                      },
-                      "lineStyle": {
-                        "type": "dotted",
-                        "width": 2
-                      },
-                      "data": "function:windowMarkLineV2(data=data:stage_windows, label=stage_end, labelField=substage_label, startField=start_ts, colorField=color, endField=end_ts, pointOnly=true)"
-                    },
-                    "markArea": {
-                      "silent": true,
-                      "data": "function:windowMarkAreaV2(data=data:stage_windows, label=stage_end, labelField=substage_label, startField=start_ts, colorField=color, endField=end_ts, minWindowDurationSec=0, minLabelDurationSec=0, opacity=0.12, snapGaps=false)",
-                      "label": {
-                        "show": true,
-                        "position": "inside",
-                        "rotate": 90,
-                        "color": "rgba(226, 232, 240, 0.86)",
-                        "fontSize": 11,
-                        "fontWeight": 600,
-                        "overflow": "truncate"
-                      }
-                    }
-                  },
-                  {
-                    "name": "Close Well",
-                    "type": "line",
-                    "data": [],
-                    "xAxisId": "X",
-                    "yAxisId": "Y_pressure",
-                    "symbol": "none",
-                    "lineStyle": {
-                      "opacity": 0
-                    },
-                    "color": "#EAB308",
-                    "itemStyle": {
-                      "color": "#EAB308"
-                    },
-                    "tooltip": {
-                      "show": false
-                    },
-                    "emphasis": {
-                      "disabled": true
-                    },
-                    "markLine": {
-                      "symbol": [
-                        "none",
-                        "none"
-                      ],
-                      "silent": true,
-                      "label": {
-                        "show": false
-                      },
-                      "lineStyle": {
-                        "type": "dotted",
-                        "width": 2
-                      },
-                      "data": "function:windowMarkLineV2(data=data:stage_windows, label=close_well, labelField=substage_label, startField=start_ts, colorField=color, endField=end_ts, pointOnly=true)"
-                    },
-                    "markArea": {
-                      "silent": true,
-                      "data": "function:windowMarkAreaV2(data=data:stage_windows, label=close_well, labelField=substage_label, startField=start_ts, colorField=color, endField=end_ts, minWindowDurationSec=0, minLabelDurationSec=0, opacity=0.12, snapGaps=false)",
-                      "label": {
-                        "show": true,
-                        "position": "inside",
-                        "rotate": 90,
-                        "color": "rgba(226, 232, 240, 0.86)",
-                        "fontSize": 11,
-                        "fontWeight": 600,
-                        "overflow": "truncate"
-                      }
-                    }
-                  },
-                  {
-                    "type": "scatter",
-                    "encode": {
-                      "x": "chart_data.ts",
-                      "y": "chart_data.context_anchor"
-                    },
-                    "xAxisId": "X",
-                    "yAxisId": "Y_context_extent",
-                    "datasetIndex": 0,
-                    "symbolSize": 0,
-                    "silent": true,
-                    "tooltip": {
-                      "show": false
-                    },
-                    "itemStyle": {
-                      "opacity": 0
-                    },
-                    "emphasis": {
-                      "disabled": true
-                    },
-                    "legendHoverLink": false
-                  }
-                ],
-                "legend": [
-                  {
-                    "top": 8,
-                    "type": "scroll",
-                    "textStyle": {
-                      "fontSize": 14
-                    },
-                    "left": "center",
-                    "data": [
-                      "Pressure (psi)",
-                      "Rate (bpm)",
-                      "Concentration (ppa)"
-                    ]
-                  },
-                  {
-                    "top": 34,
-                    "type": "scroll",
-                    "textStyle": {
-                      "fontSize": 14
-                    },
-                    "left": "center",
-                    "data": [
-                      "Open Well",
-                      "Stage Start",
-                      "Pad",
-                      "TTR",
-                      "Slurry",
-                      "Flush",
-                      "Stage End",
-                      "Close Well"
-                    ]
-                  }
-                ],
-                "toolbox": {
-                  "show": true,
-                  "top": 44,
-                  "right": 16,
-                  "itemSize": 16,
-                  "itemGap": 10,
-                  "iconStyle": {
-                    "borderColor": "rgba(148, 163, 184, 0.95)"
-                  },
-                  "emphasis": {
-                    "iconStyle": {
-                      "borderColor": "#14B8A6"
-                    }
-                  },
-                  "feature": {
-                    "dataZoom": {
-                      "title": {
-                        "zoom": "Box Zoom",
-                        "back": "Zoom Back"
-                      },
-                      "xAxisIndex": [
-                        0
-                      ],
-                      "yAxisIndex": false
-                    },
-                    "restore": {
-                      "title": "Reset Zoom"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      },
-      {
-        "id": "substage_sapphire_scatter_chart",
-        "title": "Sapphire (Beta) Detection - Scatter",
-        "description": "Sapphire substage labels over the substage-refined titanium window.",
-        "isDataLarge": true,
-        "chrome": {
-          "showActions": false,
-          "disableCard": false,
-          "padding": {
-            "top": 8,
-            "right": 8,
-            "bottom": 8,
-            "left": 8
-          }
-        },
-        "dataConfig": {
-          "chart_data": {
-            "source": "metric",
-            "metricKey": "merged_detection_substage_sapphire_timeseries_v1",
-            "fieldName": "ts,rate_slurry,press_mainline,selected_concentration,inferred_pressure,design_rate,design_rate_high,design_rate_rampdown,substage_label,context_anchor",
-            "bindings": {
-              "query": {
-                "well_name": "well_name",
-                "stage_num": "stage_num",
-                "concentration_feature": "concentration_feature",
-                "context_minutes": "context_minutes"
-              },
-              "required": [
-                "well_name",
-                "stage_num",
-                "concentration_feature",
-                "context_minutes"
-              ]
-            }
-          },
-          "stage_windows": {
-            "source": "metric",
-            "metricKey": "merged_detection_substage_sapphire_windows_v1",
+            "metricKey": "merged_detection_sapphire_sept3_windows_v1",
             "fieldName": "substage_label,start_ts,end_ts,color,sample_count",
             "bindings": {
               "query": {
@@ -12064,6 +12078,28 @@
             ]
           },
           {
+            "instanceId": "sapphire_line_chart_main",
+            "widgetId": "sapphire_line_chart",
+            "gridPos": {
+              "x": 0,
+              "y": 6,
+              "w": 24,
+              "h": 20
+            },
+            "visibleWhen": [
+              {
+                "ref": "state.model",
+                "op": "eq",
+                "value": "sapphire"
+              },
+              {
+                "ref": "state.chart_mode",
+                "op": "eq",
+                "value": "line"
+              }
+            ]
+          },
+          {
             "instanceId": "copper_scatter_chart_main",
             "widgetId": "copper_scatter_chart",
             "gridPos": {
@@ -12152,6 +12188,28 @@
             ]
           },
           {
+            "instanceId": "sapphire_scatter_chart_main",
+            "widgetId": "sapphire_scatter_chart",
+            "gridPos": {
+              "x": 0,
+              "y": 6,
+              "w": 24,
+              "h": 20
+            },
+            "visibleWhen": [
+              {
+                "ref": "state.model",
+                "op": "eq",
+                "value": "sapphire"
+              },
+              {
+                "ref": "state.chart_mode",
+                "op": "eq",
+                "value": "scatter"
+              }
+            ]
+          },
+          {
             "instanceId": "platinum_line_chart_main",
             "widgetId": "platinum_line_chart",
             "gridPos": {
@@ -12231,50 +12289,6 @@
                 "ref": "state.model",
                 "op": "eq",
                 "value": "gold"
-              },
-              {
-                "ref": "state.chart_mode",
-                "op": "eq",
-                "value": "scatter"
-              }
-            ]
-          },
-          {
-            "instanceId": "substage_sapphire_line_chart_main",
-            "widgetId": "substage_sapphire_line_chart",
-            "gridPos": {
-              "x": 0,
-              "y": 6,
-              "w": 24,
-              "h": 20
-            },
-            "visibleWhen": [
-              {
-                "ref": "state.model",
-                "op": "eq",
-                "value": "sapphire"
-              },
-              {
-                "ref": "state.chart_mode",
-                "op": "eq",
-                "value": "line"
-              }
-            ]
-          },
-          {
-            "instanceId": "substage_sapphire_scatter_chart_main",
-            "widgetId": "substage_sapphire_scatter_chart",
-            "gridPos": {
-              "x": 0,
-              "y": 6,
-              "w": 24,
-              "h": 20
-            },
-            "visibleWhen": [
-              {
-                "ref": "state.model",
-                "op": "eq",
-                "value": "sapphire"
               },
               {
                 "ref": "state.chart_mode",

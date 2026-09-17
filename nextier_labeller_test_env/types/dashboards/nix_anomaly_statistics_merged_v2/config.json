@@ -532,10 +532,20 @@
               "containLabel": true
             },
             "xAxis": {
+              "splitLine": {
+                "show": true,
+                "lineStyle": {
+                  "color": "rgba(148, 163, 184, 0.14)",
+                  "type": "dashed"
+                }
+              },
               "type": "value",
               "name": "Segments"
             },
             "yAxis": {
+              "splitLine": {
+                "show": false
+              },
               "type": "category"
             },
             "dataset": {
@@ -610,10 +620,20 @@
               "containLabel": true
             },
             "xAxis": {
+              "splitLine": {
+                "show": true,
+                "lineStyle": {
+                  "color": "rgba(148, 163, 184, 0.14)",
+                  "type": "dashed"
+                }
+              },
               "type": "value",
               "name": "Segments"
             },
             "yAxis": {
+              "splitLine": {
+                "show": false
+              },
               "type": "category",
               "axisLabel": {
                 "hideOverlap": true
@@ -897,7 +917,7 @@
               "placeholder": "Select stage",
               "selectionMode": "single",
               "optionsMetric": {
-                "metricKey": "merged_presence_stage_options_v1",
+                "metricKey": "merged_anomaly_stage_options_v1",
                 "params": {
                   "well_name": "{{state.well_name}}"
                 },
@@ -940,7 +960,7 @@
         "dataConfig": {
           "chart_data": {
             "source": "metric",
-            "metricKey": "merged_presence_stage_drilldown_v1",
+            "metricKey": "merged_anomaly_stage_drilldown_v1",
             "fieldName": "*",
             "bindings": {
               "query": {
@@ -981,6 +1001,9 @@
                   "top": 0
                 },
                 "xAxis": {
+                  "splitLine": {
+                    "show": false
+                  },
                   "id": "X",
                   "type": "time",
                   "name": "Time",
@@ -992,18 +1015,31 @@
                 "yAxis": [
                   {
                     "id": "Y_pressure",
+                    "splitLine": {
+                      "show": true,
+                      "lineStyle": {
+                        "color": "rgba(148, 163, 184, 0.14)",
+                        "type": "dashed"
+                      }
+                    },
                     "type": "value",
                     "name": "Pressure",
                     "position": "left"
                   },
                   {
                     "id": "Y_rate",
+                    "splitLine": {
+                      "show": false
+                    },
                     "type": "value",
                     "name": "Rate",
                     "position": "right"
                   },
                   {
                     "id": "Y_conc",
+                    "splitLine": {
+                      "show": false
+                    },
                     "type": "value",
                     "name": "Concentration",
                     "position": "right",

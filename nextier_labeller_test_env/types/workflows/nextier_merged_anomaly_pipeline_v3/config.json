@@ -1,0 +1,99 @@
+{
+  "key": "nextier_merged_anomaly_pipeline_v3",
+  "displayName": "Nextier Merged Anomaly Pipeline v3 (Sapphire Gate)",
+  "description": "Stage-incremental anomaly processing gated to sapphire's (ttr, rampdown_start] window instead of platinum design/slurry labels, so a mid-stage dip no longer closes the window early. Keyed on the sapphire stage ordinal; reads telemetry once per well.",
+  "runtime": "prefect",
+  "flow": {
+    "entrypoint": "scripts/workflows/nextier_merged_anomaly_pipeline_v3/main.py:nextier_merged_anomaly_pipeline_v3_flow",
+    "include": [
+      "scripts/workflows/nextier_merged_anomaly_pipeline_v3/**/*.py"
+    ],
+    "tags": [
+      "nextier",
+      "merged",
+      "anomaly",
+      "v3",
+      "sapphire-gate"
+    ]
+  },
+  "deployment": {
+    "workPool": "default",
+    "timezone": "UTC",
+    "concurrencyLimit": 1,
+    "parameters": {
+      "mode": "incremental",
+      "max_stages": 25,
+      "algorithm_version": "sapphire-gate-v1",
+      "pressure_threshold_psi": 200,
+      "rate_drop_threshold_bpm": 5,
+      "rolling_points": 1,
+      "max_gap_seconds": 120,
+      "dry_run": false,
+      "use_joins": true
+    },
+    "concurrencyCollisionStrategy": "CANCEL_NEW"
+  },
+  "paramsSchema": {
+    "type": "object",
+    "properties": {
+      "mode": {
+        "type": "string",
+        "enum": [
+          "incremental",
+          "historical",
+          "rebuild"
+        ],
+        "default": "incremental"
+      },
+      "max_stages": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 500,
+        "default": 25
+      },
+      "well_name": {
+        "type": "string"
+      },
+      "algorithm_version": {
+        "type": "string",
+        "default": "sapphire-gate-v1"
+      },
+      "pressure_threshold_psi": {
+        "type": "number",
+        "minimum": 0,
+        "default": 200
+      },
+      "rate_drop_threshold_bpm": {
+        "type": "number",
+        "minimum": 0,
+        "default": 5
+      },
+      "rolling_points": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 10,
+        "default": 1
+      },
+      "max_gap_seconds": {
+        "type": "number",
+        "minimum": 0,
+        "default": 120
+      },
+      "dry_run": {
+        "type": "boolean",
+        "default": false
+      },
+      "stage_num": {
+        "type": "number",
+        "description": "Sapphire stage ordinal (NOT the TD ordinal -- they differ on 346 of 396 wells)."
+      },
+      "use_joins": {
+        "type": "boolean",
+        "default": true,
+        "description": "Anchor mid-stage shutdowns on titanium sand-mass merge joins as well as the rate sandwich. Preferred; costs one titanium merge per well."
+      }
+    },
+    "required": []
+  },
+  "initialState": {}
+}

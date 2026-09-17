@@ -1,0 +1,99 @@
+{
+  "runtime": "prefect",
+  "flow": {
+    "entrypoint": "scripts/workflows/nextier_conc_channel_select_v1/main.py:nextier_conc_channel_select_v1_flow",
+    "include": [
+      "scripts/workflows/nextier_conc_channel_select_v1/**/*.py",
+      "scripts/workflows/nextier_labeling_common_v1/**/*.py"
+    ],
+    "tags": [
+      "nextier",
+      "labeling",
+      "conc-channel",
+      "auto-select"
+    ]
+  },
+  "initialState": {},
+  "key": "nextier_conc_channel_select_v1",
+  "displayName": "Nextier Conc Channel Auto-Select V1",
+  "description": "Picks the concentration channel each well's dropdown should DEFAULT to, by scoring the four channels on that well's first substage-refined stage window (starts-near-zero AND stairstep shape; ties auger -> target -> denso -> inline). Writes one row per well to nextier_well_conc_channel_v1. UI default only -- it does not change which channel titanium or sapphire label with, and the dropdown stays overridable.",
+  "deployment": {
+    "workPool": "nextier-backfill",
+    "timezone": "UTC",
+    "concurrencyLimit": 1,
+    "concurrencyCollisionStrategy": "CANCEL_NEW",
+    "parameters": {
+      "source_datastore_key": "merged_fleet_stream_customer_full_v2",
+      "substage_index_featurestore_key": "nextier_titanium_substage_index_sept3_v2",
+      "output_featurestore_key": "nextier_well_conc_channel_v1",
+      "max_wells": 500,
+      "skip_completed": false,
+      "dry_run": false,
+      "algorithm_version": "nextier_conc_channel_select_v1"
+    }
+  },
+  "paramsSchema": {
+    "type": "object",
+    "properties": {
+      "source_datastore_key": {
+        "type": "string",
+        "default": "merged_fleet_stream_customer_full_v2"
+      },
+      "substage_index_featurestore_key": {
+        "type": "string",
+        "default": "nextier_titanium_substage_index_sept3_v2"
+      },
+      "output_featurestore_key": {
+        "type": "string",
+        "default": "nextier_well_conc_channel_v1"
+      },
+      "well_name": {
+        "type": "string"
+      },
+      "well_names": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "fleet_name": {
+        "type": "string"
+      },
+      "include_fleet_names": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "exclude_fleet_names": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "pad_name": {
+        "type": "string"
+      },
+      "max_wells": {
+        "type": "number",
+        "default": 500,
+        "minimum": 1,
+        "maximum": 500
+      },
+      "skip_completed": {
+        "type": "boolean",
+        "default": false,
+        "description": "Skip wells that already have a row. False re-scores everything."
+      },
+      "dry_run": {
+        "type": "boolean",
+        "default": false
+      },
+      "algorithm_version": {
+        "type": "string",
+        "default": "nextier_conc_channel_select_v1"
+      }
+    },
+    "required": []
+  }
+}

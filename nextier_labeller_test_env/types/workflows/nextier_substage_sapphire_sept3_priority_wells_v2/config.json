@@ -28,7 +28,7 @@
     "concurrencyCollisionStrategy": "CANCEL_NEW",
     "parameters": {
       "source_datastore_key": "merged_fleet_stream_customer_full_v2",
-      "titanium_stage_index_featurestore_key": "nextier_titanium_stage_index_v1",
+      "titanium_stage_index_featurestore_key": "nextier_titanium_stage_index_v2",
       "sapphire_stage_summary_featurestore_key": "nextier_substage_sapphire_sept3_stage_summary_v2",
       "sapphire_labels_featurestore_key": "nextier_substage_sapphire_sept3_labels_v2",
       "sapphire_manifest_featurestore_key": "nextier_substage_sapphire_sept3_processing_manifest_v2",
@@ -40,7 +40,7 @@
       "dry_run": false,
       "skip_completed": true,
       "algorithm_version": "nextier_sapphire_substage_v2",
-      "titanium_algorithm_version": "nextier_titanium_stage_v1",
+      "titanium_algorithm_version": "nextier_titanium_stage_v2",
       "mode": "historical",
       "lookback_hours": 0,
       "well_names": [

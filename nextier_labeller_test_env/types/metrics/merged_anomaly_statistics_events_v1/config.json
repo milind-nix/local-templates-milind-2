@@ -1,8 +1,8 @@
 {
   "key": "merged_anomaly_statistics_events_v1",
   "displayName": "Merged Anomaly Event Drilldown",
-  "description": "Active-run contiguous anomaly windows for the selected scope.",
-  "sql": "SELECT * FROM (\nWITH active_manifest AS (\n  SELECT *\n  FROM featurestore:merged_anomaly_processing_manifest_v2\n  WHERE status = 'active'\n    AND algorithm_version = 'ds-v1'\n    AND fleet_name = :fleet_name\n    AND pad_name = :pad_name\n    AND (\n      COALESCE(CAST(:well_name AS TEXT), '') IN ('', '__ALL__')\n      OR name = CAST(:well_name AS TEXT)\n    )\n)\nSELECT\n  e.event_id,\n  e.name AS well_name,\n  e.stage_num_td AS stage_num,\n  e.anomaly,\n  e.anomaly_display,\n  e.start_ts,\n  e.end_ts,\n  e.duration_sec,\n  e.duration_min\nFROM active_manifest m\nJOIN featurestore:merged_anomaly_events_v2 e\n  ON e.processing_run_id = m.active_run_id\n AND e.name = m.name\n AND e.stage_num_td = m.stage_num_td\n AND e.algorithm_version = m.algorithm_version\nORDER BY e.start_ts DESC, e.name, e.stage_num_td\n) q",
+  "description": "Active-run contiguous anomaly windows for the selected scope. Sapphire-gated (v3 stores, sapphire stage ordinal).",
+  "sql": "SELECT * FROM (\nWITH active_manifest AS (\n  SELECT *\n  FROM featurestore:merged_anomaly_processing_manifest_v3\n  WHERE status = 'active'\n    AND algorithm_version = 'ds-v1'\n    AND fleet_name = :fleet_name\n    AND pad_name = :pad_name\n    AND (\n      COALESCE(CAST(:well_name AS TEXT), '') IN ('', '__ALL__')\n      OR name = CAST(:well_name AS TEXT)\n    )\n)\nSELECT\n  e.event_id,\n  e.name AS well_name,\n  e.stage_num AS stage_num,\n  e.anomaly,\n  e.anomaly_display,\n  e.start_ts,\n  e.end_ts,\n  e.duration_sec,\n  e.duration_min\nFROM active_manifest m\nJOIN featurestore:merged_anomaly_events_v3 e\n  ON e.processing_run_id = m.active_run_id\n AND e.name = m.name\n AND e.stage_num = m.stage_num\n AND e.algorithm_version = m.algorithm_version\nORDER BY e.start_ts DESC, e.name, e.stage_num\n) q",
   "valueSchema": {
     "type": "object",
     "properties": {

@@ -1,0 +1,100 @@
+{
+  "key": "merged_anomaly_stage_summary_v3",
+  "displayName": "Merged Anomaly Stage Summary v3",
+  "description": "Immutable per-stage anomaly counts for a completed processing run. Keyed on the SAPPHIRE stage ordinal (stage_num), not the TD ordinal -- anomalies are gated to sapphire's (ttr, rampdown_start] window.",
+  "sql": "SELECT CAST(NULL AS TEXT) AS fleet_name, CAST(NULL AS TEXT) AS pad_name, CAST(NULL AS TEXT) AS processing_run_id, CAST(NULL AS TEXT) AS algorithm_version, CAST(NULL AS TEXT) AS source_signature, CAST(NULL AS TEXT) AS name, CAST(NULL AS DOUBLE PRECISION) AS stage_num, CAST(NULL AS TEXT) AS stage_start_ts, CAST(NULL AS TEXT) AS stage_end_ts, CAST(NULL AS BIGINT) AS source_rows, CAST(NULL AS DOUBLE PRECISION) AS total_anomaly_lines, CAST(NULL AS DOUBLE PRECISION) AS pressure_surge_lines, CAST(NULL AS DOUBLE PRECISION) AS pump_rate_drop_lines, CAST(NULL AS DOUBLE PRECISION) AS mid_stage_shutdown_lines, CAST(NULL AS DOUBLE PRECISION) AS sweep_lines, CAST(NULL AS TEXT) AS created_at FROM datastore:merged_fleet_stream_customer_full_v2 WHERE 1 = 0",
+  "checkpoint_fields": [],
+  "upsert": false,
+  "dataSchema": {
+    "type": "object",
+    "properties": {
+      "fleet_name": {
+        "type": "string",
+        "metadata": {
+          "isPrimaryKey": true
+        }
+      },
+      "pad_name": {
+        "type": "string",
+        "metadata": {
+          "isPrimaryKey": true
+        }
+      },
+      "processing_run_id": {
+        "type": "string",
+        "metadata": {
+          "isPrimaryKey": true
+        }
+      },
+      "algorithm_version": {
+        "type": "string"
+      },
+      "source_signature": {
+        "type": "string"
+      },
+      "name": {
+        "type": "string",
+        "metadata": {
+          "isPrimaryKey": true
+        }
+      },
+      "stage_num": {
+        "type": "number",
+        "metadata": {
+          "isPrimaryKey": true
+        }
+      },
+      "stage_start_ts": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "stage_end_ts": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "source_rows": {
+        "type": "bigint"
+      },
+      "total_anomaly_lines": {
+        "type": "number"
+      },
+      "pressure_surge_lines": {
+        "type": "number"
+      },
+      "pump_rate_drop_lines": {
+        "type": "number"
+      },
+      "mid_stage_shutdown_lines": {
+        "type": "number"
+      },
+      "sweep_lines": {
+        "type": "number"
+      },
+      "created_at": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "gate_start_ts": {
+        "type": "string",
+        "format": "date-time",
+        "description": "Sapphire ttr. Anomalies are evaluated in (gate_start_ts, gate_end_ts]; NULL means the stage was not gated and contributes no anomaly rows."
+      },
+      "gate_end_ts": {
+        "type": "string",
+        "format": "date-time",
+        "description": "Sapphire rampdown_start -- the first sustained leave from design rate that never recovers."
+      },
+      "gate_status": {
+        "type": "string",
+        "description": "ok | no_ttr | no_rampdown | no_telemetry. Why a stage produced no anomalies, without needing to join back to the sapphire summary."
+      }
+    },
+    "required": [
+      "fleet_name",
+      "pad_name",
+      "processing_run_id",
+      "name",
+      "stage_num"
+    ]
+  }
+}

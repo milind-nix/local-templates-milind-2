@@ -1,0 +1,71 @@
+{
+  "key": "merged_anomaly_labels_v3",
+  "displayName": "Merged Anomaly Labels v3",
+  "description": "Immutable DS-algorithm anomaly labels, versioned by processing run. Keyed on the SAPPHIRE stage ordinal (stage_num), not the TD ordinal -- anomalies are gated to sapphire's (ttr, rampdown_start] window.",
+  "sql": "SELECT CAST(NULL AS TEXT) AS fleet_name, CAST(NULL AS TEXT) AS pad_name, CAST(NULL AS TEXT) AS processing_run_id, CAST(NULL AS TEXT) AS algorithm_version, CAST(NULL AS TEXT) AS source_signature, CAST(NULL AS TEXT) AS name, CAST(NULL AS DOUBLE PRECISION) AS stage_num, CAST(NULL AS TEXT) AS datetime_fmt, CAST(NULL AS TEXT) AS anomaly, CAST(NULL AS TEXT) AS created_at FROM datastore:merged_fleet_stream_customer_full_v2 WHERE 1 = 0",
+  "checkpoint_fields": [],
+  "upsert": false,
+  "dataSchema": {
+    "type": "object",
+    "properties": {
+      "fleet_name": {
+        "type": "string",
+        "metadata": {
+          "isPrimaryKey": true
+        }
+      },
+      "pad_name": {
+        "type": "string",
+        "metadata": {
+          "isPrimaryKey": true
+        }
+      },
+      "processing_run_id": {
+        "type": "string",
+        "metadata": {
+          "isPrimaryKey": true
+        }
+      },
+      "algorithm_version": {
+        "type": "string"
+      },
+      "source_signature": {
+        "type": "string"
+      },
+      "name": {
+        "type": "string",
+        "metadata": {
+          "isPrimaryKey": true
+        }
+      },
+      "stage_num": {
+        "type": "number",
+        "metadata": {
+          "isPrimaryKey": true
+        }
+      },
+      "datetime_fmt": {
+        "type": "string",
+        "format": "date-time",
+        "metadata": {
+          "isPrimaryKey": true
+        }
+      },
+      "anomaly": {
+        "type": "string"
+      },
+      "created_at": {
+        "type": "string",
+        "format": "date-time"
+      }
+    },
+    "required": [
+      "fleet_name",
+      "pad_name",
+      "processing_run_id",
+      "name",
+      "stage_num",
+      "datetime_fmt"
+    ]
+  }
+}

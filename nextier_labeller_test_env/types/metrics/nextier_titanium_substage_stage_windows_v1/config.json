@@ -1,8 +1,8 @@
 {
   "key": "nextier_titanium_substage_stage_windows_v1",
-  "displayName": "Nextier Titanium Substage Stage Windows V1",
-  "description": "Titanium stage windows re-cut to the Sapphire open_well -> close_well landmarks (the substage-refined tier). Falls back to the coarse bound wherever a landmark abstained -- start_src / end_src record which.",
-  "sql": "SELECT * FROM (\nSELECT\n  CAST(s.stage_num AS TEXT) AS window_label,\n  CAST(s.stage_start_ts AS TIMESTAMP) AS start_ts,\n  CAST(s.stage_end_ts AS TIMESTAMP) AS end_ts,\n  '#8B5CF6' AS color,\n  CAST(0 AS DOUBLE PRECISION) AS sample_count\nFROM featurestore:nextier_titanium_substage_index_sept3_v2 s\nWHERE COALESCE(NULLIF(CAST(:stage_model AS TEXT), ''), 'silver') = 'titanium'\n  AND s.well_name = :well_name\n  AND s.stage_num IS NOT NULL\n  AND s.stage_start_ts IS NOT NULL AND s.stage_end_ts IS NOT NULL\n  AND CAST(s.stage_start_ts AS TIMESTAMP) <= CAST(:end_time AS TIMESTAMP)\n  AND CAST(s.stage_end_ts AS TIMESTAMP) >= CAST(:start_time AS TIMESTAMP)\n  AND CAST(s.stage_start_ts AS TIMESTAMP) <= CAST(s.stage_end_ts AS TIMESTAMP)\n) q\nORDER BY start_ts, CAST(window_label AS DOUBLE PRECISION)",
+  "displayName": "Nextier Titanium Substage-Refined Windows",
+  "description": "The third titanium stage tier: coarse titanium windows re-bound to the substage landmarks sapphire placed -- start is open_well when placed and the coarse start otherwise, end is close_well when placed and the coarse end otherwise. Renders as a layer beside titanium_first and titanium_final, so the fringe either side of the final band is the open_well/close_well extension. Bound to the sept3 v2 vintage only, which is the one derived from nextier_titanium_stage_index_v2, so it is gated to the 'titanium_beta' stage model and returns no rows for silver or titanium v1 -- pairing it with v1 coarse windows would overlay two different vintages.",
+  "sql": "SELECT * FROM (\nSELECT\n  CAST(s.stage_num AS TEXT) AS window_label,\n  CAST(s.stage_start_ts AS TIMESTAMP) AS start_ts,\n  CAST(s.stage_end_ts AS TIMESTAMP) AS end_ts,\n  '#A855F7' AS color,\n  CAST(0 AS DOUBLE PRECISION) AS sample_count\nFROM featurestore:nextier_titanium_substage_index_sept3_v2 s\nWHERE COALESCE(NULLIF(CAST(:stage_model AS TEXT), ''), 'silver') = 'titanium_beta'\n  AND s.well_name = :well_name\n  AND s.stage_num IS NOT NULL\n  AND s.stage_start_ts IS NOT NULL AND s.stage_end_ts IS NOT NULL\n  AND CAST(s.stage_start_ts AS TIMESTAMP) <= CAST(:end_time AS TIMESTAMP)\n  AND CAST(s.stage_end_ts AS TIMESTAMP) >= CAST(:start_time AS TIMESTAMP)\n  AND CAST(s.stage_start_ts AS TIMESTAMP) <= CAST(s.stage_end_ts AS TIMESTAMP)\n) q\nORDER BY start_ts, CAST(window_label AS DOUBLE PRECISION)",
   "valueSchema": {
     "type": "object",
     "properties": {
@@ -45,7 +45,8 @@
         "default": "silver",
         "enum": [
           "silver",
-          "titanium"
+          "titanium",
+          "titanium_beta"
         ]
       }
     },

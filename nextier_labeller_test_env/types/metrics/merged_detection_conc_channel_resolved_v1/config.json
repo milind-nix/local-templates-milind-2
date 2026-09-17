@@ -1,0 +1,26 @@
+{
+  "key": "merged_detection_conc_channel_resolved_v1",
+  "displayName": "Merged Detection Conc Channel Resolved",
+  "description": "The concentration channel the auto-selector chose for a well, as a single row. Falls back to 'auger' when the well has no pick or no row at all. Dashboards call this on well change to pre-select the dropdown.",
+  "sql": "SELECT COALESCE((SELECT wc.concentration_feature FROM featurestore:nextier_well_conc_channel_v1 wc WHERE wc.well_name = :well_name), 'auger') AS concentration_feature",
+  "valueSchema": {
+    "type": "object",
+    "properties": {
+      "concentration_feature": {
+        "type": "string"
+      }
+    },
+    "required": []
+  },
+  "paramsSchema": {
+    "type": "object",
+    "properties": {
+      "well_name": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "well_name"
+    ]
+  }
+}

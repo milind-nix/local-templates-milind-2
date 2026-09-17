@@ -324,6 +324,9 @@
                       }
                     },
                     "default": "previous_6h"
+                  },
+                  "concentration_feature": {
+                    "type": "string"
                   }
                 },
                 "required": [
@@ -344,7 +347,8 @@
                 "end_time": "{{state.end_time}}",
                 "well_name_filter": "{{state.well_name_filter}}",
                 "stage_num_filter": "{{state.stage_num_filter}}",
-                "data_window": "{{state.data_window}}"
+                "data_window": "{{state.data_window}}",
+                "concentration_feature": "{{state.concentration_feature}}"
               },
               "layout": {
                 "cols": 12,
@@ -582,6 +586,20 @@
                   "op": "not_empty"
                 }
               ]
+            },
+            {
+              "type": "compute_metric",
+              "metricKey": "merged_detection_conc_channel_resolved_v1",
+              "params": {
+                "well_name": "{{form.well_name}}"
+              },
+              "resultKey": "conc_pick"
+            },
+            {
+              "type": "set_form_values",
+              "updates": {
+                "concentration_feature": "{{context.conc_pick.first.concentration_feature}}"
+              }
             }
           ],
           "stage_num_changed": [
@@ -786,6 +804,12 @@
                   "op": "not_empty"
                 }
               ]
+            },
+            {
+              "type": "set_state",
+              "updates": {
+                "concentration_feature": "{{form.concentration_feature}}"
+              }
             }
           ],
           "data_window_changed": [

@@ -1,0 +1,83 @@
+{
+  "key": "nextier_well_conc_channel_v1",
+  "displayName": "Nextier Well Conc Channel V1",
+  "description": "One row per well: which proppant-concentration channel the dashboards should DEFAULT to. Scored on the well's first three substage-refined stage windows (open_well -> close_well) by the nextier-dash conc-channel auto-select algorithm: a channel qualifies when it starts near zero AND passes the stairstep fit_stage gate; ties break auger -> target -> denso -> inline (denso before inline here on purpose, unlike the global CONC_CHANNEL_ORDER). This is a UI default only -- it does not change which channel the labelling algorithms use, and the dropdown stays manually overridable.",
+  "sql": "SELECT CAST(NULL AS TEXT) AS well_name, CAST(NULL AS TEXT) AS conc_col, CAST(NULL AS TEXT) AS concentration_feature, CAST(NULL AS TEXT) AS candidates, CAST(NULL AS TEXT) AS reason, CAST(NULL AS DOUBLE PRECISION) AS stage_num, CAST(NULL AS TEXT) AS t0, CAST(NULL AS TEXT) AS t1, CAST(NULL AS TEXT) AS channel_notes, CAST(NULL AS DOUBLE PRECISION) AS sample_count, CAST(NULL AS TEXT) AS algorithm_version, CAST(NULL AS TEXT) AS source_mode, CAST(NULL AS TEXT) AS run_id, CAST(NULL AS TEXT) AS processed_at, CAST(NULL AS DOUBLE PRECISION) AS refine_n, CAST(NULL AS TEXT) AS stages_scored FROM datastore:merged_fleet_stream_customer_full_v2 WHERE 1 = 0",
+  "checkpoint_fields": [],
+  "upsert": true,
+  "dataSchema": {
+    "type": "object",
+    "required": [
+      "well_name"
+    ],
+    "properties": {
+      "well_name": {
+        "type": "string",
+        "description": "Well name. One row per well.",
+        "metadata": {
+          "isPrimaryKey": true
+        }
+      },
+      "conc_col": {
+        "type": "string",
+        "description": "Physical column chosen (e.g. prop_conc_blend_auger), or NULL when nothing qualified."
+      },
+      "concentration_feature": {
+        "type": "string",
+        "description": "The chosen column mapped to the dashboard's slot name: auger | target | denso | inline. NULL when conc_col is NULL. This is the value the dropdown uses."
+      },
+      "candidates": {
+        "type": "string",
+        "description": "JSON list of columns that passed BOTH gates, in evaluation order. Empty when the pick came from the starts-at-0 fallback."
+      },
+      "reason": {
+        "type": "string",
+        "description": "stairstep_starts_at_0 | stairstep | fallback_present | no_candidate | empty first-stage window. Tiers, best across the scored stages (ties go to the later stage)."
+      },
+      "stage_num": {
+        "type": "number",
+        "description": "Stage number of the WINNING window among those scored."
+      },
+      "t0": {
+        "type": "string",
+        "description": "Window start (open_well, else coarse start)."
+      },
+      "t1": {
+        "type": "string",
+        "description": "Window end (close_well, else coarse end)."
+      },
+      "channel_notes": {
+        "type": "string",
+        "description": "JSON: per-channel present / starts_at_0 / is_stairstep / reject_reason / n_steps for the winning stage, plus a `by_stage` map of every scored stage."
+      },
+      "sample_count": {
+        "type": "number",
+        "description": "Telemetry rows in the scored window."
+      },
+      "algorithm_version": {
+        "type": "string",
+        "description": "Selector version."
+      },
+      "source_mode": {
+        "type": "string",
+        "description": "Run mode that produced the row."
+      },
+      "run_id": {
+        "type": "string",
+        "description": "Prefect run id."
+      },
+      "processed_at": {
+        "type": "string",
+        "description": "UTC timestamp of the write."
+      },
+      "refine_n": {
+        "type": "number",
+        "description": "How many refined stage windows were scored (up to 3)."
+      },
+      "stages_scored": {
+        "type": "string",
+        "description": "JSON list of the stage numbers scored."
+      }
+    }
+  }
+}

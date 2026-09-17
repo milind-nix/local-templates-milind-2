@@ -1,0 +1,174 @@
+{
+  "runtime": "prefect",
+  "flow": {
+    "entrypoint": "scripts/workflows/nextier_titanium_stage_orchestration_v2/main.py:nextier_titanium_stage_orchestration_v2_flow",
+    "include": [
+      "scripts/workflows/nextier_titanium_stage_orchestration_v2/**/*.py",
+      "scripts/workflows/nextier_labeling_common_v1/**/*.py"
+    ],
+    "tags": [
+      "nextier",
+      "stage-detection",
+      "titanium",
+      "historical",
+      "beta"
+    ]
+  },
+  "paramsSchema": {
+    "type": "object",
+    "properties": {
+      "mode": {
+        "type": "string",
+        "enum": [
+          "live",
+          "background",
+          "historical",
+          "debug"
+        ]
+      },
+      "source_datastore_key": {
+        "type": "string",
+        "default": "merged_fleet_stream_customer_full_v2"
+      },
+      "well_name": {
+        "type": "string"
+      },
+      "fleet_name": {
+        "type": "string"
+      },
+      "include_fleet_names": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Optional fleet names to include. Use this to partition runs by fleet."
+      },
+      "exclude_fleet_names": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Optional fleet names to exclude. Cannot be used with include_fleet_names."
+      },
+      "pad_name": {
+        "type": "string"
+      },
+      "start_time": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "end_time": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "lookback_hours": {
+        "type": "number",
+        "minimum": 0
+      },
+      "context_hours": {
+        "type": "number",
+        "minimum": 0,
+        "description": "Telemetry context loaded before the selected Titanium window. Context rows are not written."
+      },
+      "boundary_context_hours": {
+        "type": "number",
+        "minimum": 0,
+        "default": 0.5,
+        "description": "Hours added around an existing Titanium boundary stage when a window cuts through it."
+      },
+      "max_boundary_expansion_hours": {
+        "type": "number",
+        "minimum": 0,
+        "default": 96,
+        "description": "Maximum left/right expansion allowed while making the Titanium window stage-safe."
+      },
+      "max_wells": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 500,
+        "description": "Maximum wells processed per time chunk."
+      },
+      "delete_existing": {
+        "type": "boolean",
+        "default": true
+      },
+      "dry_run": {
+        "type": "boolean",
+        "default": false
+      },
+      "algorithm_version": {
+        "type": "string",
+        "default": "nextier_titanium_stage_v2"
+      },
+      "chunk_hours": {
+        "type": "number",
+        "minimum": 0,
+        "default": 6
+      },
+      "max_chunks": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 1000
+      },
+      "skip_completed": {
+        "type": "boolean",
+        "default": false
+      },
+      "titanium_labels_featurestore_key": {
+        "type": "string",
+        "default": "nextier_titanium_labels_v2"
+      },
+      "titanium_stage_index_featurestore_key": {
+        "type": "string",
+        "default": "nextier_titanium_stage_index_v2"
+      },
+      "titanium_manifest_featurestore_key": {
+        "type": "string",
+        "default": "nextier_titanium_processing_manifest_v2"
+      },
+      "well_names": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "concentration_feature": {
+        "type": "string",
+        "default": "auger",
+        "enum": [
+          "auger",
+          "denso",
+          "inline",
+          "target"
+        ]
+      }
+    },
+    "required": []
+  },
+  "initialState": {},
+  "key": "nextier_titanium_stage_historical_orchestration_v2",
+  "displayName": "Nextier Titanium Stage Historical Orchestration V2 (Beta)",
+  "description": "Manual historical Titanium stage labeling. Supports fleet, pad, well, and well_names filters. BETA algorithm -- writes the *_v2 featurestores. Runs alongside V1, which keeps its own tables so the original titanium output is untouched.",
+  "deployment": {
+    "workPool": "nextier-backfill",
+    "timezone": "UTC",
+    "concurrencyLimit": 1,
+    "parameters": {
+      "mode": "historical",
+      "source_datastore_key": "merged_fleet_stream_customer_full_v2",
+      "lookback_hours": 0,
+      "context_hours": 0.5,
+      "boundary_context_hours": 0.5,
+      "max_boundary_expansion_hours": 96,
+      "chunk_hours": 20000,
+      "max_chunks": null,
+      "max_wells": 30,
+      "delete_existing": true,
+      "dry_run": false,
+      "skip_completed": true,
+      "algorithm_version": "nextier_titanium_stage_v2",
+      "concentration_feature": "auger"
+    },
+    "concurrencyCollisionStrategy": "CANCEL_NEW"
+  }
+}

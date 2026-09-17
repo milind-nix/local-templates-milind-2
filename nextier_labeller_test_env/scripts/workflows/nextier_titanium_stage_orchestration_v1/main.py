@@ -90,151 +90,27 @@ async def _previous_stage_offset(
     return int(value or 0)
 
 
-def _final_stage_masses(
-    compute: pd.DataFrame,
-    well_name: str,
-    result: Any,
-    logger: Any,
-) -> tuple[dict[int, float], str | None]:
-    """Sand mass per FINAL stage ordinal, plus titanium's own merge note.
-
-    Why this is worth a second pipeline pass:
-
-    `TitaniumResult.stage_mass_klb` is `base["stage_mass_klb"]` -- aligned to
-    `stages_base`, BEFORE the sand/schedule split runs. When a split fires,
-    `stages_final` is longer than `stages_base` and the two no longer line up,
-    so the masses on the result object cannot be zipped onto the final stages.
-    `_apply_splits` is what redistributes them, and it needs the split grid,
-    which the result object does not carry.
-
-    `titanium_merged_full(split=True, split_mode="final")` is the SSOT helper
-    that runs detect -> merge -> continuity -> split and returns `stages` and
-    `stage_mass_klb` aligned AFTER the split. It costs a second detect/merge
-    pass over the same frame; the alternative is re-deriving the split
-    apportionment here, which would put algorithm code in the template and
-    could go silently wrong.
-
-    Guarded on the windows coming back identical to `result.stages_final`. If
-    they diverge for any reason, this returns no masses rather than masses
-    attached to the wrong stages -- a NULL makes sapphire fall back to its own
-    computation, a wrong number would not.
-
-    FINAL only. `stages_first` is a different list with a different split, and
-    a mass map for it would mean a third pass. Rows with `stage_status='first'`
-    keep a NULL mass and sapphire's `stage_source=first` path falls back.
-    """
-    try:
-        from nextier_utils.labeling.titanium.pipeline import titanium_merged_full
-
-        full = titanium_merged_full(
-            well_name, compute,
-            rate_col="rate_slurry", pressure_col="press_mainline",
-            split=True, split_mode="final",
-        )
-    except Exception:  # noqa: BLE001 -- mass is an enrichment, not the answer
-        logger.exception("Titanium stage-mass computation failed well=%s", well_name)
-        return {}, getattr(result, "merge_note", None)
-
-    note = full.get("merge_note") or getattr(result, "merge_note", None)
-    stages = list(full.get("stages") or [])
-    masses = list(full.get("stage_mass_klb") or [])
-    expected = list(getattr(result, "stages_final", None) or [])
-
-    def _norm(spans: list[Any]) -> list[tuple[Any, Any]]:
-        return [(pd.Timestamp(a), pd.Timestamp(b)) for a, b in spans]
-
-    if len(masses) != len(stages) or _norm(stages) != _norm(expected):
-        logger.warning(
-            "Titanium stage-mass DIVERGED well=%s final_stages=%s recomputed=%s masses=%s "
-            "-- writing NULL masses; sapphire will fall back to its own computation",
-            well_name, len(expected), len(stages), len(masses),
-        )
-        return {}, note
-
-    out: dict[int, float] = {}
-    for k, m in enumerate(masses, start=1):
-        try:
-            mv = float(m)
-        except (TypeError, ValueError):
-            continue
-        if np.isfinite(mv):
-            out[k] = mv
-    logger.info(
-        "Titanium stage-mass ready well=%s stages=%s finite_masses=%s merge_note=%s",
-        well_name, len(stages), len(out), str(note)[:200] if note else None,
-    )
-    return out, note
-
-
-def _build_stage_index(
-    labels: pd.DataFrame,
-    run_id: str,
-    algorithm_version: str,
-    mode: str,
-    stage_mass_by_ordinal: dict[int, float] | None = None,
-    stage_offset: int = 0,
-    merge_note: str | None = None,
-) -> pd.DataFrame:
+def _build_stage_index(labels: pd.DataFrame, run_id: str, algorithm_version: str, mode: str) -> pd.DataFrame:
     if labels.empty:
         return pd.DataFrame()
-    ordered = labels.copy().sort_values(["record_ts", "created_ts", "telemetry_point_id"], na_position="last")
+    frame = labels.copy().sort_values(["record_ts", "created_ts", "telemetry_point_id"], na_position="last")
+    frame["_stage"] = frame.apply(_stage_value, axis=1).astype(float)
+    frame["_status"] = np.where(frame["titanium_final"].fillna(0).astype(float) > 0, "final", "first")
+    frame = frame[frame["_stage"] > 0].copy()
+    if frame.empty:
+        return pd.DataFrame()
 
-    # BOTH tiers get their own windows.
-    #
-    # This used to derive one status per row -- "final" when titanium_final > 0,
-    # else "first" -- and segment once. But the two tiers overlap almost
-    # everywhere: on AUSTIN 474-1004H all 201,963 labeled rows carry BOTH a
-    # first and a final ordinal, and not one row is first-only. So every row
-    # classified as "final", the index held 38 final windows and ZERO first
-    # ones, and the FIRST tier -- which the reference dashboard reports as 39
-    # stages, from 37 merged + 2 splits with 1 later withdrawn -- could not be
-    # reconstructed from the featurestore at all. `first_start_ts` was NULL on
-    # every row, so sapphire's `stage_source=first` path had nothing to read
-    # either.
-    #
-    # The row data was never wrong: titanium_first reaches ordinal 39 and
-    # titanium_final reaches 38, exactly as the algorithm reports. It was the
-    # index that collapsed them. Segment once per tier and emit both, so the
-    # index carries 39 first windows AND 38 final windows.
-    #
-    # `stage_uid` already includes the status, so the two sets cannot collide.
-    rows: list[dict[str, Any]] = []
-    for status, source_col in (("first", "titanium_first"), ("final", "titanium_final")):
-        if source_col not in ordered.columns:
-            continue
-        frame = ordered.copy()
-        frame["_stage"] = pd.to_numeric(frame[source_col], errors="coerce").fillna(0).astype(float)
-        frame = frame[frame["_stage"] > 0].copy()
-        if frame.empty:
-            continue
+    # Split on stage/status changes and large telemetry gaps. This keeps the
+    # compact index faithful to exactly what Titanium labeled in row data.
+    ts = pd.to_datetime(frame["record_ts"], errors="coerce")
+    change = (frame["_stage"] != frame["_stage"].shift()) | (frame["_status"] != frame["_status"].shift())
+    change |= ts.diff().dt.total_seconds().fillna(0) > 300
+    frame["_segment"] = change.cumsum()
 
-        # Split on stage changes and large telemetry gaps. This keeps the
-        # compact index faithful to exactly what Titanium labeled in row data.
-        ts = pd.to_datetime(frame["record_ts"], errors="coerce")
-        change = frame["_stage"] != frame["_stage"].shift()
-        change |= ts.diff().dt.total_seconds().fillna(0) > 300
-        frame["_segment"] = change.cumsum()
-
-        rows.extend(_stage_index_rows(
-            frame, status, algorithm_version, mode,
-            stage_mass_by_ordinal, stage_offset, merge_note,
-        ))
-    return pd.DataFrame(rows)
-
-
-def _stage_index_rows(
-    frame: pd.DataFrame,
-    status: str,
-    algorithm_version: str,
-    mode: str,
-    stage_mass_by_ordinal: dict[int, float] | None,
-    stage_offset: int,
-    merge_note: str | None,
-) -> list[dict[str, Any]]:
-    """One index row per contiguous segment of `frame`, for a single tier."""
     rows: list[dict[str, Any]] = []
     for _, group in frame.groupby("_segment", sort=True):
         stage_num = float(group["_stage"].iloc[0])
+        status = str(group["_status"].iloc[0])
         start_ts = group["record_ts"].min()
         end_ts = group["record_ts"].max()
         base = {
@@ -260,35 +136,13 @@ def _stage_index_rows(
             "avg_press_mainline": group["press_mainline"].astype(float).mean() if "press_mainline" in group else None,
             "max_press_mainline": group["press_mainline"].astype(float).max() if "press_mainline" in group else None,
             "stage_status": status,
-            # Sand mass for this stage, from titanium's own integral.
-            #
-            # Sapphire needs one mass per stage window or it abstains on
-            # stage_start and everything measured from it. Without this column
-            # it re-derives them by feeding the STORED windows back through
-            # `titanium_merge`, which welds light adjacent spans and so returns
-            # FEWER masses than there are stages (AUSTIN 474-1004H: 56 stages,
-            # 38 masses) -- the "stage-mass MISALIGNED" warning. Carrying the
-            # mass titanium already computed removes the round trip entirely.
-            #
-            # `stage_num` here is offset-adjusted for backfill continuity;
-            # the map is keyed by the run-local ordinal, hence the subtraction.
-            # FINAL only -- see `_final_stage_masses`.
-            "stage_mass_klb": (
-                (stage_mass_by_ordinal or {}).get(int(stage_num) - int(stage_offset))
-                if status == "final" else None
-            ),
-            # Titanium's own explanation when a well gets no usable masses
-            # (e.g. "concentration channel is not zeroed ... spans are left
-            # UNMERGED"). Previously discarded, which made a mass-starved well
-            # indistinguishable from a healthy one downstream.
-            "merge_note": merge_note,
             "source_stage_column": "titanium_final" if status == "final" else "titanium_first",
             "algorithm_version": algorithm_version,
             "source_mode": mode,
             "processed_at": now_utc(),
         }
         rows.append(base)
-    return rows
+    return pd.DataFrame(rows)
 
 
 async def _delete_outputs(
@@ -630,44 +484,12 @@ async def _process_well(
 
     compute = raw.rename(columns={"record_ts": DATETIME_COL}).copy()
     conc_col = CONC_COLUMNS.get(concentration_feature, "prop_conc_blend_auger")
-
-    # Make `concentration_feature` actually select a channel.
-    #
-    # run_titanium_layer aliases the requested column into PROP_CONC_COL and
-    # leaves the rest of the frame alone. But PROP_CONC_COL is
-    # `prop_conc_blend_denso`, which is LAST in CONC_CHANNEL_ORDER
-    # (auger -> target -> inline -> denso), and both `titanium_merge` and
-    # `titanium_split_grid` pick their channel with `first_finite_conc_col`,
-    # which walks that order. So the alias is only ever consulted when the
-    # three higher-priority channels are all empty, and picking `denso`
-    # explicitly is a no-op besides (the aliasing is guarded on
-    # `conc_col != PROP_CONC_COL`). In practice any well with a populated
-    # auger channel was silently computed on auger no matter what was
-    # requested.
-    #
-    # Dropping the other channels from the COMPUTE frame -- `raw` is untouched,
-    # so the label rows still carry all four for the charts -- leaves
-    # `first_finite_conc_col` exactly one candidate, which is the requested
-    # one. Only done when the requested channel actually has finite data:
-    # otherwise this would turn "your pick is empty" into "this well has no
-    # concentration at all" and silently disable merge and split.
-    conc_selected = conc_col
-    if conc_col in compute.columns:
-        vals = pd.to_numeric(compute[conc_col], errors="coerce")
-        if bool(np.isfinite(vals.to_numpy(dtype=float)).any()):
-            drop = [c for c in CONC_COLUMNS.values() if c != conc_col and c in compute.columns]
-            compute = compute.drop(columns=drop)
-        else:
-            conc_selected = f"{conc_col} (EMPTY -- falling back to channel order)"
-    else:
-        conc_selected = f"{conc_col} (ABSENT -- falling back to channel order)"
-
     logger.info(
         "Titanium compute start well=%s rows=%s algorithm_version=%s conc_col=%s ds_callable=nextier_core.titanium_layer.run_titanium_layer",
         well_name,
         len(compute),
         algorithm_version,
-        conc_selected,
+        conc_col,
     )
     result = run_titanium_layer(
         compute,
@@ -676,7 +498,6 @@ async def _process_well(
         pressure_col="press_mainline",
         conc_col=conc_col,
     )
-    stage_mass_by_ordinal, merge_note = _final_stage_masses(compute, well_name, result, logger)
     labeled = raw.copy()
     labeled["titanium_first"] = np.asarray(result.titanium_first, dtype=float)
     labeled["titanium_final"] = np.asarray(result.titanium_final, dtype=float)
@@ -710,40 +531,16 @@ async def _process_well(
         enriched = enriched[pd.to_datetime(enriched["record_ts"], errors="coerce") < effective_end_ts]
     enriched = enriched.rename(columns={"name": "well_name", "id": "well_id"})
 
-    # Prefer the source id for upsert compatibility with raw telemetry -- but
-    # ONLY when it is actually a per-row identifier.
-    #
-    # `telemetry_point_id` is the PRIMARY KEY of the labels featurestore, so a
-    # value repeated across rows does not merely look wrong, it upserts every
-    # one of those rows onto a single record. On this datastore `id` is a
-    # per-WELL identifier: AUSTIN 474-1004H carries the literal 'WELL02' on all
-    # 579,837 of its rows, so the whole well collapsed to ONE label row and the
-    # detection chart had nothing to draw.
-    #
-    # It went unnoticed because the wells titanium had run on carry a NULL `id`
-    # and so took the fallback branch, which is per-row and correct (prod's
-    # keys all look like 'WELL:2025-01-24T16:10:50.000000:0'). AUSTIN is simply
-    # the first well with a populated non-unique `id` to be run.
-    #
-    # So: use the source id only if it is unique across the frame, otherwise
-    # build the composite key. The fallback format is unchanged, so rows
-    # already written under it upsert in place rather than duplicating.
+    # Prefer the source id for upsert compatibility with raw telemetry. If an
+    # id is missing, build a stable per-row key instead of collapsing rows into
+    # a shared null/nan key.
     row_key_ts = pd.to_datetime(enriched["record_ts"], errors="coerce").dt.strftime("%Y-%m-%dT%H:%M:%S.%f")
     source_ids = enriched["well_id"] if "well_id" in enriched else pd.Series([None] * len(enriched), index=enriched.index)
-    composite = (
-        enriched["well_name"].astype(str) + ":" + row_key_ts.fillna("") + ":" + enriched.index.astype(str)
+    enriched["telemetry_point_id"] = np.where(
+        source_ids.notna(),
+        source_ids.astype(str),
+        enriched["well_name"].astype(str) + ":" + row_key_ts.fillna("") + ":" + enriched.index.astype(str),
     )
-    ids_usable = bool(source_ids.notna().all()) and bool(source_ids.nunique() == len(enriched))
-    if not ids_usable and bool(source_ids.notna().any()):
-        logger.warning(
-            "Titanium source id is not a per-row key well=%s rows=%s distinct_ids=%s sample=%r "
-            "-- using composite telemetry_point_id (using the id would collapse the well to "
-            "%s label row(s))",
-            well_name, len(enriched), int(source_ids.nunique()),
-            str(source_ids.dropna().iloc[0]) if source_ids.notna().any() else None,
-            int(source_ids.nunique()),
-        )
-    enriched["telemetry_point_id"] = source_ids.astype(str) if ids_usable else composite
     enriched["algorithm_version"] = algorithm_version
     enriched["source_mode"] = mode
     enriched["processed_at"] = now_utc()
@@ -757,12 +554,7 @@ async def _process_well(
     write_frame = enriched
     if effective_start_ts is not None:
         write_frame = write_frame[pd.to_datetime(write_frame["record_ts"], errors="coerce") >= effective_start_ts]
-    stage_index = _build_stage_index(
-        enriched, run_id, algorithm_version, mode,
-        stage_mass_by_ordinal=stage_mass_by_ordinal,
-        stage_offset=offset,
-        merge_note=merge_note,
-    )
+    stage_index = _build_stage_index(enriched, run_id, algorithm_version, mode)
 
     if not dry_run:
         if delete_existing:

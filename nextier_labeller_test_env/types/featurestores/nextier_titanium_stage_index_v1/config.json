@@ -1,8 +1,8 @@
 {
   "key": "nextier_titanium_stage_index_v1",
   "displayName": "Nextier Titanium Stage Index V1",
-  "description": "Compact Titanium stage windows. final windows are authoritative; first windows are causal/live. stage_mass_klb carries titanium's own per-stage sand mass (FINAL rows only) so sapphire need not re-derive it.",
-  "sql": "SELECT CAST(NULL AS TEXT) AS stage_uid, fleet_name, pad_name, name AS well_name, id AS well_id, api_num, CAST(NULL AS DOUBLE PRECISION) AS stage_num, CAST(NULL AS TEXT) AS stage_start_ts, CAST(NULL AS TEXT) AS stage_end_ts, CAST(NULL AS TEXT) AS first_start_ts, CAST(NULL AS TEXT) AS first_end_ts, CAST(NULL AS TEXT) AS final_start_ts, CAST(NULL AS TEXT) AS final_end_ts, CAST(NULL AS DOUBLE PRECISION) AS sample_count, CAST(NULL AS DOUBLE PRECISION) AS avg_rate_slurry, CAST(NULL AS DOUBLE PRECISION) AS max_rate_slurry, CAST(NULL AS DOUBLE PRECISION) AS avg_press_mainline, CAST(NULL AS DOUBLE PRECISION) AS max_press_mainline, CAST(NULL AS TEXT) AS stage_status, CAST(NULL AS DOUBLE PRECISION) AS stage_mass_klb, CAST(NULL AS TEXT) AS merge_note, CAST(NULL AS TEXT) AS source_stage_column, CAST(NULL AS TEXT) AS algorithm_version, CAST(NULL AS TEXT) AS source_mode, CAST(NULL AS TEXT) AS processed_at FROM datastore:merged_fleet_stream_customer_full_v2 WHERE 1 = 0",
+  "description": "Compact Titanium stage windows. final windows are authoritative; first windows are causal/live.",
+  "sql": "SELECT CAST(NULL AS TEXT) AS stage_uid, fleet_name, pad_name, name AS well_name, id AS well_id, api_num, CAST(NULL AS DOUBLE PRECISION) AS stage_num, CAST(NULL AS TEXT) AS stage_start_ts, CAST(NULL AS TEXT) AS stage_end_ts, CAST(NULL AS TEXT) AS first_start_ts, CAST(NULL AS TEXT) AS first_end_ts, CAST(NULL AS TEXT) AS final_start_ts, CAST(NULL AS TEXT) AS final_end_ts, CAST(NULL AS DOUBLE PRECISION) AS sample_count, CAST(NULL AS DOUBLE PRECISION) AS avg_rate_slurry, CAST(NULL AS DOUBLE PRECISION) AS max_rate_slurry, CAST(NULL AS DOUBLE PRECISION) AS avg_press_mainline, CAST(NULL AS DOUBLE PRECISION) AS max_press_mainline, CAST(NULL AS TEXT) AS stage_status, CAST(NULL AS TEXT) AS source_stage_column, CAST(NULL AS TEXT) AS algorithm_version, CAST(NULL AS TEXT) AS source_mode, CAST(NULL AS TEXT) AS processed_at FROM datastore:merged_fleet_stream_customer_full_v2 WHERE 1 = 0",
   "checkpoint_fields": [],
   "upsert": true,
   "dataSchema": {
@@ -72,12 +72,6 @@
         "type": "number"
       },
       "stage_status": {
-        "type": "string"
-      },
-      "stage_mass_klb": {
-        "type": "number"
-      },
-      "merge_note": {
         "type": "string"
       },
       "source_stage_column": {

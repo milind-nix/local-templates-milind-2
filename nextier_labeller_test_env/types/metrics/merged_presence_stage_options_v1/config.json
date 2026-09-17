@@ -2,7 +2,7 @@
   "key": "merged_presence_stage_options_v1",
   "displayName": "Merged Presence Stage Options",
   "description": "All-stages option and TD stages for a selected well.",
-  "sql": "SELECT * FROM (\nSELECT '-1' AS value, 'Select stage' AS label, 0 AS sort_order\nUNION ALL\nSELECT DISTINCT CAST(stage_num_td AS TEXT) AS value, CAST(stage_num_td AS TEXT) AS label, 1 AS sort_order\nFROM featurestore:merged_platinum_labels_v1\nWHERE name = :well_name\n  AND CAST(:well_name AS TEXT) NOT IN ('', '__ALL__')\n  AND stage_num_td IS NOT NULL\n  AND substage IS NOT NULL\n  AND LOWER(substage) <> 'na'\nORDER BY sort_order, value\n) q",
+  "sql": "SELECT * FROM (\nSELECT '-1' AS value, 'Select stage' AS label, 0 AS sort_order\nUNION ALL\nSELECT DISTINCT CAST(stage_num_td AS TEXT) AS value, CAST(stage_num_td AS TEXT) AS label, 1 AS sort_order\nFROM featurestore:merged_platinum_labels_v1\nWHERE name = :well_name\n  AND CAST(:well_name AS TEXT) NOT IN ('', '__ALL__')\n  AND stage_num_td IS NOT NULL\n  AND substage IS NOT NULL\n  AND LOWER(substage) <> 'na'\n) q\nORDER BY q.sort_order, CAST(q.value AS DOUBLE PRECISION)",
   "valueSchema": {
     "type": "object",
     "properties": {

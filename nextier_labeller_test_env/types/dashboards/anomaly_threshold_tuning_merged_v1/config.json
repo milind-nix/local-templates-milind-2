@@ -633,6 +633,9 @@
               "containLabel": true
             },
             "xAxis": {
+              "splitLine": {
+                "show": false
+              },
               "type": "category",
               "axisLabel": {
                 "rotate": 35,
@@ -640,6 +643,13 @@
               }
             },
             "yAxis": {
+              "splitLine": {
+                "show": true,
+                "lineStyle": {
+                  "color": "rgba(148, 163, 184, 0.14)",
+                  "type": "dashed"
+                }
+              },
               "type": "value",
               "name": "Segments"
             },
@@ -746,10 +756,20 @@
               "containLabel": true
             },
             "xAxis": {
+              "splitLine": {
+                "show": false
+              },
               "type": "category",
               "name": "Triggered Segments"
             },
             "yAxis": {
+              "splitLine": {
+                "show": true,
+                "lineStyle": {
+                  "color": "rgba(148, 163, 184, 0.14)",
+                  "type": "dashed"
+                }
+              },
               "type": "value",
               "name": "Stages"
             },
@@ -937,6 +957,9 @@
             "xAxis": [
               {
                 "type": "time",
+                "splitLine": {
+                  "show": false
+                },
                 "gridIndex": 0,
                 "axisLabel": {
                   "show": false
@@ -944,6 +967,9 @@
               },
               {
                 "type": "time",
+                "splitLine": {
+                  "show": false
+                },
                 "gridIndex": 1,
                 "name": "Time",
                 "axisLabel": {
@@ -955,11 +981,25 @@
             "yAxis": [
               {
                 "type": "value",
+                "splitLine": {
+                  "show": true,
+                  "lineStyle": {
+                    "color": "rgba(148, 163, 184, 0.14)",
+                    "type": "dashed"
+                  }
+                },
                 "gridIndex": 0,
                 "name": "Pressure \u0394"
               },
               {
                 "type": "value",
+                "splitLine": {
+                  "show": true,
+                  "lineStyle": {
+                    "color": "rgba(148, 163, 184, 0.14)",
+                    "type": "dashed"
+                  }
+                },
                 "gridIndex": 1,
                 "name": "Rate \u0394"
               }

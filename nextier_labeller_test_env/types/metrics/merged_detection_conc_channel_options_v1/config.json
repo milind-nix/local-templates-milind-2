@@ -1,0 +1,32 @@
+{
+  "key": "merged_detection_conc_channel_options_v1",
+  "displayName": "Merged Detection Conc Channel Options",
+  "description": "Concentration dropdown options for one well. 'Auto' is first and names the channel the selector picked for that well; the matching explicit channel is tagged with an arrow so the pick is visible either way.",
+  "sql": "SELECT * FROM (\nSELECT 0 AS ord,\n       'auto' AS value,\n       'Auto \u2014 ' || INITCAP(COALESCE(w.concentration_feature, 'auger')) || CASE WHEN w.concentration_feature IS NULL THEN ' (fallback)' ELSE '' END AS label\nFROM (SELECT 1) _one\nLEFT JOIN featurestore:nextier_well_conc_channel_v1 w ON w.well_name = :well_name\nUNION ALL SELECT 1, 'auger',  'Auger'  || CASE WHEN EXISTS (SELECT 1 FROM featurestore:nextier_well_conc_channel_v1 x WHERE x.well_name = :well_name AND x.concentration_feature = 'auger')  THEN ' \u2190 auto' ELSE '' END\nUNION ALL SELECT 2, 'target', 'Target' || CASE WHEN EXISTS (SELECT 1 FROM featurestore:nextier_well_conc_channel_v1 x WHERE x.well_name = :well_name AND x.concentration_feature = 'target') THEN ' \u2190 auto' ELSE '' END\nUNION ALL SELECT 3, 'denso',  'Denso'  || CASE WHEN EXISTS (SELECT 1 FROM featurestore:nextier_well_conc_channel_v1 x WHERE x.well_name = :well_name AND x.concentration_feature = 'denso')  THEN ' \u2190 auto' ELSE '' END\nUNION ALL SELECT 4, 'inline', 'Inline' || CASE WHEN EXISTS (SELECT 1 FROM featurestore:nextier_well_conc_channel_v1 x WHERE x.well_name = :well_name AND x.concentration_feature = 'inline') THEN ' \u2190 auto' ELSE '' END\n) q ORDER BY ord",
+  "valueSchema": {
+    "type": "object",
+    "properties": {
+      "ord": {
+        "type": "number"
+      },
+      "value": {
+        "type": "string"
+      },
+      "label": {
+        "type": "string"
+      }
+    },
+    "required": []
+  },
+  "paramsSchema": {
+    "type": "object",
+    "properties": {
+      "well_name": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "well_name"
+    ]
+  }
+}

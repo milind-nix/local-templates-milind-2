@@ -1,0 +1,79 @@
+{
+  "key": "merged_anomaly_events_v3",
+  "displayName": "Merged Anomaly Events v3",
+  "description": "Immutable contiguous anomaly event windows produced by DS aggregation helpers. Keyed on the SAPPHIRE stage ordinal (stage_num), not the TD ordinal -- anomalies are gated to sapphire's (ttr, rampdown_start] window.",
+  "sql": "SELECT CAST(NULL AS TEXT) AS fleet_name, CAST(NULL AS TEXT) AS pad_name, CAST(NULL AS TEXT) AS processing_run_id, CAST(NULL AS TEXT) AS algorithm_version, CAST(NULL AS TEXT) AS source_signature, CAST(NULL AS TEXT) AS event_id, CAST(NULL AS TEXT) AS name, CAST(NULL AS DOUBLE PRECISION) AS stage_num, CAST(NULL AS TEXT) AS anomaly, CAST(NULL AS TEXT) AS anomaly_display, CAST(NULL AS TEXT) AS start_ts, CAST(NULL AS TEXT) AS end_ts, CAST(NULL AS DOUBLE PRECISION) AS duration_sec, CAST(NULL AS DOUBLE PRECISION) AS duration_min, CAST(NULL AS TEXT) AS created_at FROM datastore:merged_fleet_stream_customer_full_v2 WHERE 1 = 0",
+  "checkpoint_fields": [],
+  "upsert": false,
+  "dataSchema": {
+    "type": "object",
+    "properties": {
+      "fleet_name": {
+        "type": "string",
+        "metadata": {
+          "isPrimaryKey": true
+        }
+      },
+      "pad_name": {
+        "type": "string",
+        "metadata": {
+          "isPrimaryKey": true
+        }
+      },
+      "processing_run_id": {
+        "type": "string",
+        "metadata": {
+          "isPrimaryKey": true
+        }
+      },
+      "algorithm_version": {
+        "type": "string"
+      },
+      "source_signature": {
+        "type": "string"
+      },
+      "event_id": {
+        "type": "string",
+        "metadata": {
+          "isPrimaryKey": true
+        }
+      },
+      "name": {
+        "type": "string"
+      },
+      "stage_num": {
+        "type": "number"
+      },
+      "anomaly": {
+        "type": "string"
+      },
+      "anomaly_display": {
+        "type": "string"
+      },
+      "start_ts": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "end_ts": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "duration_sec": {
+        "type": "number"
+      },
+      "duration_min": {
+        "type": "number"
+      },
+      "created_at": {
+        "type": "string",
+        "format": "date-time"
+      }
+    },
+    "required": [
+      "fleet_name",
+      "pad_name",
+      "processing_run_id",
+      "event_id"
+    ]
+  }
+}
