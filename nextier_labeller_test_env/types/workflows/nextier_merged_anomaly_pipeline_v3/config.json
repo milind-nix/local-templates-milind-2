@@ -48,8 +48,9 @@
       "max_stages": {
         "type": "integer",
         "minimum": 1,
-        "maximum": 500,
-        "default": 25
+        "maximum": 25000,
+        "default": 25,
+        "description": "Per-run candidate cap. The fleet is ~19.5k stages, so the inherited v2 limit of 500 meant 39 manual runs. Safe to raise: `mode=incremental` excludes anything already in the manifest, so a crashed run resumes exactly where it stopped rather than restarting."
       },
       "well_name": {
         "type": "string"
