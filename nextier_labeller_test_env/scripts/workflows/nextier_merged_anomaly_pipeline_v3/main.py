@@ -109,8 +109,13 @@ async def _candidate_stages(
             WHERE :force_rebuild
                OR m.name IS NULL
                OR m.source_rows IS DISTINCT FROM s.source_rows
-               OR CAST(m.latest_source_updated_at AS timestamp)
-                    IS DISTINCT FROM s.latest_source_updated_at
+               -- Compare at MILLISECOND precision. The featurestore write truncates a
+               -- datetime to ms, so the manifest holds 03:00:28.484000 where sapphire's
+               -- processed_at is 03:00:28.484189. A raw IS DISTINCT FROM is therefore
+               -- always true and `incremental` reprocesses the whole fleet every run --
+               -- no resumability, and a duplicate summary row per stage per run.
+               OR date_trunc('milliseconds', CAST(m.latest_source_updated_at AS timestamp))
+                    IS DISTINCT FROM date_trunc('milliseconds', s.latest_source_updated_at)
             ORDER BY s.name, s.stage_num
             LIMIT {int(max_stages)}
         """,
