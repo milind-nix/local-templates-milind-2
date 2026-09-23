@@ -85,7 +85,7 @@
       },
       "titanium_stage_index_featurestore_key": {
         "type": "string",
-        "default": "nextier_titanium_stage_index_v1",
+        "default": "nextier_titanium_stage_index_v2",
         "description": "Coarse titanium windows Sapphire places landmarks on."
       },
       "sapphire_stage_summary_featurestore_key": {
@@ -219,7 +219,7 @@
       },
       "titanium_algorithm_version": {
         "type": "string",
-        "default": "nextier_titanium_stage_v1",
+        "default": "nextier_titanium_stage_v2",
         "description": "Only read coarse windows produced by this titanium version, so a titanium change does not silently mix two vintages."
       }
     },
