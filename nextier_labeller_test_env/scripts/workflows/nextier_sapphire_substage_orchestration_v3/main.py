@@ -69,7 +69,7 @@ from scripts.workflows.nextier_labeling_common_v1.common import (
 WORKFLOW_NAME = "nextier_sapphire_substage_orchestration_v3"
 DEFAULT_ALGORITHM_VERSION = "nextier_sapphire_substage_v3"
 
-TITANIUM_STAGE_INDEX_FEATURESTORE_KEY = "nextier_titanium_stage_index_v1"
+TITANIUM_STAGE_INDEX_FEATURESTORE_KEY = "nextier_titanium_stage_index_v2"
 SAPPHIRE_STAGE_SUMMARY_FEATURESTORE_KEY = "nextier_substage_sapphire_sept3_stage_summary_v2"
 SAPPHIRE_LABELS_FEATURESTORE_KEY = "nextier_substage_sapphire_sept3_labels_v2"
 SAPPHIRE_MANIFEST_FEATURESTORE_KEY = "nextier_substage_sapphire_sept3_processing_manifest_v2"
