@@ -1125,7 +1125,7 @@ async def nextier_sapphire_substage_orchestration_v2_flow(
     delete_existing: bool = True,
     dry_run: bool = False,
     algorithm_version: str = DEFAULT_ALGORITHM_VERSION,
-    titanium_algorithm_version: str | None = "nextier_titanium_stage_v1",
+    titanium_algorithm_version: str | None = "nextier_titanium_stage_v2",
 ) -> dict[str, Any]:
     del workflow_id  # Platform flow contract; lineage lives in the manifest.
     logger = get_run_logger()
