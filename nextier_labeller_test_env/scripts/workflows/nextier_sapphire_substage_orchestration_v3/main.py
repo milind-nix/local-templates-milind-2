@@ -1129,6 +1129,8 @@ async def _process_well(
 async def _select_wells(
     workspace_id: int,
     stage_index_key: str,
+    stage_summary_key: str,
+    algorithm_version: str,
     stage_source: str,
     well_name: str | None,
     well_names: list[str] | None,
@@ -1140,15 +1142,28 @@ async def _select_wells(
     end_ts: pd.Timestamp | None,
     max_wells: int,
 ) -> list[str]:
-    """Wells that have closed titanium stages in scope, fewest stages first.
+    """Wells with at least one PENDING closed titanium stage, cheapest first.
 
-    Ordering by stage count is deliberate: it puts the cheap wells through
-    first, so a run against a heavy fleet still produces outputs early instead
-    of spending its whole budget on one well.
+    "Pending" mirrors `_already_placed`/`_contiguous_pending`: a stage counts
+    as done only when the summary's stored titanium_stage_uid still matches
+    today's candidate. A well fully covered under `algorithm_version` drops out
+    of selection entirely rather than merely being skipped once picked --
+    without this, a bounded max_wells on a fleet bigger than it (the normal
+    case for a scheduled, chunked backfill) reselects the SAME cheapest-N
+    wells forever, since the selection query itself had no notion of
+    completion and stage_count ordering never changes. With it, a modest
+    max_wells on a recurring schedule pages through the whole fleet over
+    successive runs and then idles at zero once caught up -- which is the
+    actual mechanism a cron-style backfill needs; there is no separate
+    "resume where the fleet left off" state anywhere else.
+
+    Ordering by (remaining) stage count is still deliberate: cheap wells clear
+    first, so a scheduled run produces output early rather than spending its
+    whole budget on whatever happens to sort first alphabetically.
     """
     start_col, end_col = _stage_window_columns(stage_source)
     conditions = [f"{start_col} IS NOT NULL", f"{end_col} IS NOT NULL", "well_name IS NOT NULL"]
-    params: dict[str, Any] = {}
+    params: dict[str, Any] = {"algorithm_version": algorithm_version}
     apply_well_name_filters(conditions, params, "well_name", well_name=well_name, well_names=well_names)
     apply_fleet_filters(
         conditions, params, "fleet_name",
@@ -1167,11 +1182,26 @@ async def _select_wells(
 
     frame = await query_store(
         sql=f"""
-            SELECT well_name, COUNT(*) AS stage_count
-            FROM featurestore:{stage_index_key}
-            WHERE {" AND ".join(conditions)}
-            GROUP BY well_name
-            ORDER BY stage_count ASC, well_name ASC
+            WITH eligible AS (
+              SELECT well_name, stage_num, stage_uid AS titanium_stage_uid
+              FROM featurestore:{stage_index_key}
+              WHERE {" AND ".join(conditions)}
+            ),
+            placed AS (
+              SELECT well_name, stage_num, titanium_stage_uid
+              FROM featurestore:{stage_summary_key}
+              WHERE algorithm_version = :algorithm_version
+            )
+            SELECT e.well_name,
+                   COUNT(*) AS pending_count
+            FROM eligible e
+            LEFT JOIN placed p
+              ON p.well_name = e.well_name AND p.stage_num = e.stage_num
+            GROUP BY e.well_name
+            HAVING COUNT(*) FILTER (
+              WHERE p.titanium_stage_uid IS DISTINCT FROM e.titanium_stage_uid
+            ) > 0
+            ORDER BY pending_count ASC, e.well_name ASC
         """,
         workspace_id=workspace_id,
         params=params,
@@ -1230,7 +1260,8 @@ async def nextier_sapphire_substage_orchestration_v3_flow(
     start_ts, end_ts = resolve_window(mode, start_time, end_time, lookback_hours)
 
     wells = await _select_wells(
-        workspace_id, titanium_stage_index_featurestore_key, stage_source,
+        workspace_id, titanium_stage_index_featurestore_key, sapphire_stage_summary_featurestore_key,
+        algorithm_version, stage_source,
         well_name, well_names, fleet_name, pad_name, include_fleets, exclude_fleets,
         start_ts, end_ts, max_wells,
     )
