@@ -159,11 +159,27 @@ async def _already_placed(
     stage_summary_key: str,
     well_name: str,
     algorithm_version: str,
-) -> set[int]:
-    """Stage ordinals this well already has placements for."""
+) -> dict[int, str]:
+    """Stage ordinals this well already has placements for, with the titanium
+    source each one was placed against.
+
+    A bare stage_num is not enough: it means "the Nth closed stage", and N is
+    just a position in whatever titanium index supplied the candidate list.
+    Point the same algorithm_version at a DIFFERENT titanium store or version
+    -- a different total stage count, different windows -- and stage_num 1..K
+    is satisfied by rows computed from a completely different set of
+    boundaries. That happened here: a run against titanium_stage_index_v1
+    (80 stages) made every stage_num 1..57 in titanium_stage_index_v2's own
+    numbering look "already placed", so the v2 re-run skipped the well
+    outright and left the v1-derived rows in place, wrong window and all.
+    titanium_stage_uid ("titanium_algorithm_version:well:stage_num:
+    stage_source:start_ts") is what actually identifies a stage -- carried on
+    every summary row already -- so a stage_num only counts as done when the
+    stored uid still matches what today's candidate list would produce.
+    """
     frame = await query_store(
         sql=f"""
-            SELECT DISTINCT stage_num
+            SELECT DISTINCT stage_num, titanium_stage_uid
             FROM featurestore:{stage_summary_key}
             WHERE well_name = :well_name AND algorithm_version = :algorithm_version
               AND stage_num IS NOT NULL
@@ -173,11 +189,16 @@ async def _already_placed(
     )
     df = frame.to_pandas() if isinstance(frame, pl.DataFrame) else pd.DataFrame(frame)
     if df.empty:
-        return set()
-    return {int(v) for v in pd.to_numeric(df["stage_num"], errors="coerce").dropna()}
+        return {}
+    out: dict[int, str] = {}
+    for stage_num, uid in zip(df["stage_num"], df.get("titanium_stage_uid", [])):
+        n = pd.to_numeric(stage_num, errors="coerce")
+        if pd.notna(n):
+            out[int(n)] = uid
+    return out
 
 
-def _contiguous_pending(stages: pd.DataFrame, placed: set[int]) -> pd.DataFrame:
+def _contiguous_pending(stages: pd.DataFrame, placed: dict[int, str]) -> pd.DataFrame:
     """The unplaced tail, never a subset with holes.
 
     SapphireLayer carries causal look-left state -- ring period, prior stage end.
@@ -185,11 +206,21 @@ def _contiguous_pending(stages: pd.DataFrame, placed: set[int]) -> pd.DataFrame:
     the placements for 5 wrong in a way nothing downstream can detect. So work
     resumes from the first unplaced stage and takes everything after it, even if
     some later stages were already placed; those get recomputed and upserted.
+
+    A stage_num counts as placed only if the stored titanium_stage_uid still
+    matches the candidate's -- see `_already_placed`. A source change makes
+    every stage_num look pending again, from 1, which is the correct behaviour:
+    the whole well needs redoing against the new titanium windows, not just
+    whatever tail extends past the old stage count.
     """
     if stages.empty:
         return stages
     ordinals = [int(v) for v in stages["stage_num"]]
-    first_pending = next((i for i, n in enumerate(ordinals) if n not in placed), None)
+    uids = list(stages["titanium_stage_uid"]) if "titanium_stage_uid" in stages.columns else [None] * len(stages)
+    first_pending = next(
+        (i for i, (n, u) in enumerate(zip(ordinals, uids)) if placed.get(n) != u),
+        None,
+    )
     if first_pending is None:
         return stages.iloc[0:0]
     return stages.iloc[first_pending:].reset_index(drop=True)
@@ -596,20 +627,19 @@ async def _delete_outputs(
     substage_index_key: str,
     algorithm_version: str,
 ) -> None:
-    """Clear this well's rows for the stages about to be rewritten.
+    """Clear this well's rows for exactly these stage numbers.
 
-    Scoped to the stage range actually recomputed, not the whole well: a run
-    that resumes at stage 40 must not delete stages 1-39 it is not going to
-    write back.
+    An explicit `in` list, not a [min, max] range -- also used for orphan
+    cleanup (see `_process_well`), where the stale set is whatever the old
+    titanium source's tail leaves behind and is not guaranteed contiguous
+    with what is being recomputed this run.
     """
     if not stage_nums:
         return
-    lo, hi = min(stage_nums), max(stage_nums)
     filters = [
         {"field": "well_name", "op": "eq", "value": well_name},
         {"field": "algorithm_version", "op": "eq", "value": algorithm_version},
-        {"field": "stage_num", "op": "gte", "value": lo},
-        {"field": "stage_num", "op": "lte", "value": hi},
+        {"field": "stage_num", "op": "in", "value": sorted({int(v) for v in stage_nums})},
     ]
     for key in (stage_summary_key, substage_index_key, labels_key):
         await delete_featurestore_records(
@@ -655,8 +685,31 @@ async def _process_well(
         logger.info("Sapphire no closed titanium stages well=%s stage_source=%s", well_name, stage_source)
         return {"well_name": well_name, "status": "empty", "stages": 0}
 
-    if skip_completed:
+    # Fetched whenever either flag needs it, not just skip_completed: a well whose
+    # titanium source shrank (fewer stages than an earlier run under this same
+    # algorithm_version) can leave a tail of orphan rows this run's own recompute
+    # never touches -- see `_delete_outputs`. That tail has to be found here,
+    # against the FULL candidate list, before max_stages narrows `pending` below.
+    placed: dict[int, str] = {}
+    if skip_completed or delete_existing:
         placed = await _already_placed(workspace_id, stage_summary_key, well_name, algorithm_version)
+
+    if delete_existing and placed:
+        orphans = sorted(n for n in placed if n not in set(int(v) for v in stages["stage_num"]))
+        if orphans:
+            logger.warning(
+                "Sapphire purging orphan stage rows well=%s stage_nums=%s -- recorded under "
+                "algorithm_version=%s but absent from the current titanium candidate list, "
+                "most likely a prior run against a different titanium source",
+                well_name, orphans, algorithm_version,
+            )
+            await _delete_outputs(
+                workspace_id, well_name, orphans,
+                stage_summary_key, labels_key, substage_index_key, algorithm_version,
+            )
+            placed = {n: u for n, u in placed.items() if n not in orphans}
+
+    if skip_completed:
         pending = _contiguous_pending(stages, placed)
         if pending.empty:
             logger.info("Sapphire well already complete well=%s stages=%s", well_name, len(stages))
