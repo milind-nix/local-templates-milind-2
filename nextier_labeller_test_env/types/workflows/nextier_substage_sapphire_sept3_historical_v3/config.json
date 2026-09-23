@@ -1,0 +1,187 @@
+{
+  "runtime": "prefect",
+  "flow": {
+    "entrypoint": "scripts/workflows/nextier_sapphire_substage_orchestration_v3/main.py:nextier_sapphire_substage_orchestration_v3_flow",
+    "include": [
+      "scripts/workflows/nextier_sapphire_substage_orchestration_v3/**/*.py",
+      "scripts/workflows/nextier_labeling_common_v1/**/*.py"
+    ],
+    "tags": [
+      "nextier",
+      "labeling",
+      "substage",
+      "substage-labeling",
+      "sapphire",
+      "sept3",
+      "historical",
+      "v3"
+    ]
+  },
+  "initialState": {},
+  "key": "nextier_substage_sapphire_sept3_historical_v3",
+  "displayName": "Nextier Substage Sapphire Sept3 Historical V3",
+  "description": "Sapphire substage detection, algorithm vintage v3 (nextier-dash 7303ffdc, the 2026-09-21 substage release). Writes the SAME three featurestores as v2 -- the keys carry the algorithm version, so v2 and v3 rows coexist and neither overwrites the other, and delete_existing is scoped to this version. Compare the two before retiring v2. Manual historical Sapphire substage placement over closed titanium stages. Supports fleet, pad, well and well_names filters. Wells are taken cheapest-first so a heavy fleet still yields outputs early.",
+  "deployment": {
+    "workPool": "nextier-backfill",
+    "timezone": "UTC",
+    "parameters": {
+      "source_datastore_key": "merged_fleet_stream_customer_full_v2",
+      "titanium_stage_index_featurestore_key": "nextier_titanium_stage_index_v2",
+      "sapphire_stage_summary_featurestore_key": "nextier_substage_sapphire_sept3_stage_summary_v2",
+      "sapphire_labels_featurestore_key": "nextier_substage_sapphire_sept3_labels_v2",
+      "sapphire_manifest_featurestore_key": "nextier_substage_sapphire_sept3_processing_manifest_v2",
+      "titanium_substage_index_featurestore_key": "nextier_titanium_substage_index_sept3_v2",
+      "context_hours": 0.5,
+      "stage_source": "final",
+      "concentration_feature": "auger",
+      "delete_existing": true,
+      "dry_run": false,
+      "skip_completed": true,
+      "algorithm_version": "nextier_sapphire_substage_v3",
+      "titanium_algorithm_version": "nextier_titanium_stage_v2",
+      "mode": "historical",
+      "lookback_hours": 0,
+      "max_wells": 30
+    }
+  },
+  "paramsSchema": {
+    "type": "object",
+    "properties": {
+      "mode": {
+        "type": "string",
+        "enum": [
+          "live",
+          "background",
+          "historical",
+          "debug"
+        ],
+        "default": "historical"
+      },
+      "source_datastore_key": {
+        "type": "string",
+        "default": "merged_fleet_stream_customer_full_v2"
+      },
+      "titanium_stage_index_featurestore_key": {
+        "type": "string",
+        "default": "nextier_titanium_stage_index_v1",
+        "description": "Coarse titanium windows Sapphire places landmarks on."
+      },
+      "sapphire_stage_summary_featurestore_key": {
+        "type": "string",
+        "default": "nextier_substage_sapphire_sept3_stage_summary_v2"
+      },
+      "sapphire_labels_featurestore_key": {
+        "type": "string",
+        "default": "nextier_substage_sapphire_sept3_labels_v2"
+      },
+      "sapphire_manifest_featurestore_key": {
+        "type": "string",
+        "default": "nextier_substage_sapphire_sept3_processing_manifest_v2"
+      },
+      "titanium_substage_index_featurestore_key": {
+        "type": "string",
+        "default": "nextier_titanium_substage_index_sept3_v2",
+        "description": "Substage-refined titanium windows derived from the placements."
+      },
+      "well_name": {
+        "type": "string"
+      },
+      "well_names": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Explicit well names to process in one run. This is the lever for priority work -- a heavy fleet has no way to starve wells named here."
+      },
+      "fleet_name": {
+        "type": "string"
+      },
+      "include_fleet_names": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Fleet names to include. Partitions runs by fleet."
+      },
+      "exclude_fleet_names": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Fleet names to exclude. Cannot be used with include_fleet_names."
+      },
+      "pad_name": {
+        "type": "string"
+      },
+      "start_time": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "end_time": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "lookback_hours": {
+        "type": "number",
+        "default": 0
+      },
+      "context_hours": {
+        "type": "number",
+        "default": 0.5,
+        "description": "Telemetry loaded either side of the stage span, so the detectors see the approach to open_well and the tail after close_well."
+      },
+      "stage_source": {
+        "type": "string",
+        "enum": [
+          "final",
+          "first"
+        ],
+        "default": "final",
+        "description": "Which titanium split supplies coarse windows. 'final' is post-stage and authoritative; 'first' is causal and only useful for checking what would have been placed live."
+      },
+      "concentration_feature": {
+        "type": "string",
+        "enum": [
+          "auger",
+          "denso",
+          "inline",
+          "target"
+        ],
+        "default": "auger"
+      },
+      "max_wells": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 500,
+        "default": 30
+      },
+      "max_stages": {
+        "type": "integer",
+        "minimum": 1,
+        "description": "Cap stages per well per run. Stages are always taken as a contiguous run from the first unplaced one -- never a subset with holes, which would corrupt look-left memory."
+      },
+      "skip_completed": {
+        "type": "boolean",
+        "default": true
+      },
+      "delete_existing": {
+        "type": "boolean",
+        "default": true
+      },
+      "dry_run": {
+        "type": "boolean",
+        "default": false
+      },
+      "algorithm_version": {
+        "type": "string",
+        "default": "nextier_sapphire_substage_v3"
+      },
+      "titanium_algorithm_version": {
+        "type": "string",
+        "default": "nextier_titanium_stage_v1",
+        "description": "Only read coarse windows produced by this titanium version, so a titanium change does not silently mix two vintages."
+      }
+    },
+    "required": []
+  }
+}
