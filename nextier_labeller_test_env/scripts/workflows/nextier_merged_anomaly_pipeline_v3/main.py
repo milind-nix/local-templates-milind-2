@@ -47,9 +47,12 @@ def _as_pandas(frame: Any) -> pd.DataFrame:
     return frame if isinstance(frame, pd.DataFrame) else pd.DataFrame(frame)
 
 
-def _source_signature(row: dict[str, Any], algorithm_version: str) -> str:
+def _source_signature(row: dict[str, Any], algorithm_version: str, sapphire_algorithm_version: str) -> str:
     # label_row_count + processed_at come from the sapphire summary, so a sapphire
     # re-run of a stage invalidates that stage here and nothing else does.
+    # sapphire_algorithm_version is in the payload too: pointing this pipeline at a
+    # different sapphire vintage is a source change even when every other field
+    # happens to coincide, and should invalidate the signature same as any other.
     payload = "|".join(
         str(row.get(key) or "")
         for key in (
@@ -63,12 +66,13 @@ def _source_signature(row: dict[str, Any], algorithm_version: str) -> str:
             "gate_end_ts",
         )
     )
-    return sha256(f"{algorithm_version}|{payload}".encode()).hexdigest()
+    return sha256(f"{algorithm_version}|{sapphire_algorithm_version}|{payload}".encode()).hexdigest()
 
 
 async def _candidate_stages(
     workspace_id: int,
     algorithm_version: str,
+    sapphire_algorithm_version: str,
     mode: str,
     max_stages: int,
     well_name: str | None,
@@ -95,6 +99,7 @@ async def _candidate_stages(
                 AND s.stage_num IS NOT NULL
                 AND s.stage_start_ts IS NOT NULL
                 AND s.stage_end_ts IS NOT NULL
+                AND s.algorithm_version = :sapphire_algorithm_version
                 AND (:well_name = '' OR s.well_name = :well_name)
                 AND (:stage_num < 0 OR CAST(s.stage_num AS DOUBLE PRECISION) = :stage_num)
               GROUP BY s.well_name, CAST(s.stage_num AS DOUBLE PRECISION)
@@ -110,6 +115,7 @@ async def _candidate_stages(
         workspace_id=workspace_id,
         params={
             "algorithm_version": algorithm_version,
+            "sapphire_algorithm_version": sapphire_algorithm_version,
             "well_name": (well_name or "").strip(),
             "stage_num": float(stage_num) if stage_num is not None else -1.0,
         },
@@ -132,7 +138,7 @@ async def _candidate_stages(
     out: list[dict[str, Any]] = []
     for row in (rows.to_dicts() if not rows.is_empty() else []):
         stored = row.pop("manifest_signature", None)
-        if force or not stored or stored != _source_signature(row, algorithm_version):
+        if force or not stored or stored != _source_signature(row, algorithm_version, sapphire_algorithm_version):
             out.append(row)
         if len(out) >= max_stages:
             break
@@ -250,6 +256,7 @@ def _prepare_outputs(
     conc_col: str,
     joins: list[Any],
     algorithm_version: str,
+    sapphire_algorithm_version: str,
     pressure_threshold_psi: float,
     rate_drop_threshold_bpm: float,
     rolling_points: int,
@@ -272,7 +279,7 @@ def _prepare_outputs(
     pad_name = str(candidate.get("pad_name") or "Unknown")
     run_id = str(uuid4())
     created_at = _now()
-    signature = _source_signature(candidate, algorithm_version)
+    signature = _source_signature(candidate, algorithm_version, sapphire_algorithm_version)
 
     gate_start = candidate.get("gate_start_ts")
     gate_end = candidate.get("gate_end_ts")
@@ -434,6 +441,7 @@ async def nextier_merged_anomaly_pipeline_v3_flow(
     well_name: str | None = None,
     stage_num: float | None = None,
     algorithm_version: str = "sapphire-gate-v1",
+    sapphire_algorithm_version: str = "nextier_sapphire_substage_v3",
     pressure_threshold_psi: float = 200.0,
     rate_drop_threshold_bpm: float = 5.0,
     rolling_points: int = 1,
@@ -446,12 +454,12 @@ async def nextier_merged_anomaly_pipeline_v3_flow(
         raise ValueError("mode must be incremental, historical, or rebuild")
     logger = get_run_logger()
     candidates = await _candidate_stages(
-        workspace_id, algorithm_version, mode, max_stages, well_name, stage_num,
+        workspace_id, algorithm_version, sapphire_algorithm_version, mode, max_stages, well_name, stage_num,
     )
     logger.info(
         "Anomaly v3 start mode=%s gate=sapphire(ttr,rampdown] candidates=%s "
-        "joins=%s algorithm_version=%s",
-        mode, len(candidates), use_joins, algorithm_version,
+        "joins=%s algorithm_version=%s sapphire_algorithm_version=%s",
+        mode, len(candidates), use_joins, algorithm_version, sapphire_algorithm_version,
     )
 
     by_well: dict[str, list[dict[str, Any]]] = {}
@@ -494,6 +502,7 @@ async def nextier_merged_anomaly_pipeline_v3_flow(
                 slice_df, candidate,
                 conc_col=conc_col, joins=joins,
                 algorithm_version=algorithm_version,
+                sapphire_algorithm_version=sapphire_algorithm_version,
                 pressure_threshold_psi=pressure_threshold_psi,
                 rate_drop_threshold_bpm=rate_drop_threshold_bpm,
                 rolling_points=rolling_points,

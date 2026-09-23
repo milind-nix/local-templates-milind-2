@@ -1,7 +1,7 @@
 {
   "key": "nextier_merged_anomaly_pipeline_v3",
   "displayName": "Nextier Merged Anomaly Pipeline v3 (Sapphire Gate)",
-  "description": "Stage-incremental anomaly processing gated to sapphire's (ttr, rampdown_start] window instead of platinum design/slurry labels, so a mid-stage dip no longer closes the window early. Keyed on the sapphire stage ordinal; reads telemetry once per well.",
+  "description": "Stage-incremental anomaly processing gated to sapphire's (ttr, rampdown_start] window instead of platinum design/slurry labels, so a mid-stage dip no longer closes the window early. Keyed on the sapphire stage ordinal; reads telemetry once per well. Reads sapphire's stage summary scoped to a single sapphire_algorithm_version -- v2 and v3 sapphire rows coexist in that store, and without this filter the gate blends ttr from one vintage with rampdown_start from the other on any well processed by both.",
   "runtime": "prefect",
   "flow": {
     "entrypoint": "scripts/workflows/nextier_merged_anomaly_pipeline_v3/main.py:nextier_merged_anomaly_pipeline_v3_flow",
@@ -29,7 +29,8 @@
       "rolling_points": 1,
       "max_gap_seconds": 120,
       "dry_run": false,
-      "use_joins": true
+      "use_joins": true,
+      "sapphire_algorithm_version": "nextier_sapphire_substage_v3"
     },
     "concurrencyCollisionStrategy": "CANCEL_NEW"
   },
@@ -58,6 +59,10 @@
       "algorithm_version": {
         "type": "string",
         "default": "sapphire-gate-v1"
+      },
+      "sapphire_algorithm_version": {
+        "type": "string",
+        "default": "nextier_sapphire_substage_v3"
       },
       "pressure_threshold_psi": {
         "type": "number",
